@@ -118,6 +118,11 @@ describe.each(ERAS)('protocol $era', ({ era, mode }) => {
     expect(seen('get_review_comments')).toContain('Ask the person before you change anything else.');
     expect(seen('get_review_comments')).toContain('Only the person resolves a comment');
     expect(seen('reply_to_review_comment')).toContain('only the person resolves it');
+    // A comment on removed lines numbers them in the snapshot it was written on, which the file no longer holds
+    expect(seen('get_review_comments')).toContain('side base: lines it removed, which the file no longer has');
+    // Outside a session the app takes the newest snapshot as the reply comes, which may not hold the change yet
+    expect(seen('reply_to_review_comment')).toContain('outside a session, the newest one as you reply');
+    expect(seen('reply_to_review_comment')).not.toContain('the snapshot that holds your change');
   });
 
   it('reads the review comments and replies, refusing a blank reply or one past 1,000 characters before asking the app', async () => {

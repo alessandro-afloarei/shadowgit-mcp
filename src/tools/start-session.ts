@@ -3,7 +3,7 @@ import * as z from 'zod/v4';
 import { clientName } from '../client-name.js';
 import { resolveRepo } from '../repos.js';
 import { activeSessions, startSession as startAppSession } from '../session-api.js';
-import { dataResult, plural, repoParam } from './shared.js';
+import { dataResult, forProject, plural, repoParam } from './shared.js';
 
 const Output = z.object({
   session_id: z.string(),
@@ -27,7 +27,8 @@ export async function startSession({ description, repo }: { description: string;
     );
   }
   const { sessionId: id, openComments } = await startAppSession(project.path, description, client);
-  const review = openComments > 0 ? reviewOf(openComments) : undefined;
+  // Another project's sentence names it: get_review_comments without repo would read the current one
+  const review = openComments > 0 ? `${forProject(repo, project)}${reviewOf(openComments)}` : undefined;
   return dataResult(
     Output,
     [`Started session ${id} on ${project.name}. Automatic snapshots are paused until end_session.`, ...(review === undefined ? [] : [review])].join(' '),

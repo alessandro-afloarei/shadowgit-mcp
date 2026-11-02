@@ -96,6 +96,15 @@ describe('start_session', () => {
     app.commentsAnswer = { sends: [] };
     expect((await startSession({ description: 'Fix login' }, 'Claude Code')).structuredContent).not.toHaveProperty('review');
   });
+
+  it('names another project in its review sentence, so get_review_comments reads that one', async () => {
+    app.commentsAnswer = COMMENT_ANSWERS.open;
+    const started = await startSession({ description: 'Fix login', repo: 'blog' }, 'Claude Code');
+    expect(started.structuredContent).toMatchObject({
+      repo: 'blog',
+      review: 'For blog, pass repo "blog" to each tool. The person sent 4 review comments on this project. Read them with get_review_comments when they ask you to address their review.',
+    });
+  });
 });
 
 describe('checkpoint', () => {

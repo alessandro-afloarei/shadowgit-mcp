@@ -100,6 +100,15 @@ const CASES: { phrase: string; prepare?: (app: FakeApp, project: string) => void
     },
     passed: ({ app }) => app.requests.some((request) => request.path.startsWith('/comments?')),
   },
+  {
+    // The app's own words as it sends comments: "Paste them into your agent, or ask it to read your review."
+    phrase: 'Read my review',
+    prepare: (app, project) => {
+      snapshot(project, MAP_PROJECT, 'Add the webshop');
+      app.commentsAnswer = COMMENT_ANSWERS.open;
+    },
+    passed: ({ app }) => app.requests.some((request) => request.path.startsWith('/comments?')),
+  },
 ];
 
 /** The queries of the run's GET /docs requests. */
