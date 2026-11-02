@@ -1920,6 +1920,10 @@
         "repo": {
           "type": "string"
         },
+        "review": {
+          "description": "When the person has sent review comments still open: how many, and when to read them",
+          "type": "string"
+        },
         "session_id": {
           "type": "string"
         }
@@ -4439,5 +4443,351 @@
       "type": "object"
     },
     "title": "Write docs pages"
+  },
+  {
+    "annotations": {
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": false,
+      "readOnlyHint": true
+    },
+    "description": "Read the review comments the person sent you from ShadowGit for a tracked project: the sent ones they have not resolved, grouped by the Send that carried them, oldest first. Each comment has its id, its tag (change, question or note: the person's own), its words and where it is. That is the snapshot it was written on, the file, the lines (on the new side, or removed ones, or none for the whole file), the lines quoted as they read then, and the definition around them. It also has since, the snapshot that changed its quoted lines after it was written (null when none did), and the replies so far. Each Send has the range the person had open and the files of that range they had not viewed (unviewed, then moreUnviewed), so a file they did not read is not one they approved. Change only what each comment asks, at its lines: a question is answered in your reply, and a note changes nothing unless its words ask for a change. Ask the person before you change anything else. Once a comment is done, reply to it with reply_to_review_comment: what you changed, or your answer. Only the person resolves a comment, in ShadowGit. Needs the ShadowGit app running.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "properties": {
+        "repo": {
+          "description": "Project name or absolute path. Defaults to the current project.",
+          "minLength": 1,
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "name": "get_review_comments",
+    "outputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "additionalProperties": false,
+      "properties": {
+        "next": {
+          "description": "The step that follows: change what each comment asks, then reply to each",
+          "type": "string"
+        },
+        "repo": {
+          "type": "string"
+        },
+        "sends": {
+          "items": {
+            "additionalProperties": false,
+            "properties": {
+              "at": {
+                "type": "string"
+              },
+              "comments": {
+                "items": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "anchor": {
+                      "additionalProperties": false,
+                      "properties": {
+                        "lines": {
+                          "anyOf": [
+                            {
+                              "additionalProperties": false,
+                              "properties": {
+                                "end": {
+                                  "maximum": 9007199254740991,
+                                  "minimum": -9007199254740991,
+                                  "type": "integer"
+                                },
+                                "side": {
+                                  "description": "head (new lines) or base (removed lines)",
+                                  "type": "string"
+                                },
+                                "start": {
+                                  "maximum": 9007199254740991,
+                                  "minimum": -9007199254740991,
+                                  "type": "integer"
+                                }
+                              },
+                              "required": [
+                                "side",
+                                "start",
+                                "end"
+                              ],
+                              "type": "object"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ],
+                          "description": "Null for the whole file"
+                        },
+                        "path": {
+                          "type": "string"
+                        },
+                        "quote": {
+                          "description": "The lines as they read then",
+                          "items": {
+                            "type": "string"
+                          },
+                          "type": "array"
+                        },
+                        "snapshot": {
+                          "description": "The snapshot it was written on",
+                          "type": "string"
+                        },
+                        "symbol": {
+                          "description": "The definition around them",
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        }
+                      },
+                      "required": [
+                        "snapshot",
+                        "path",
+                        "lines",
+                        "quote",
+                        "symbol"
+                      ],
+                      "type": "object"
+                    },
+                    "body": {
+                      "type": "string"
+                    },
+                    "id": {
+                      "maximum": 9007199254740991,
+                      "minimum": -9007199254740991,
+                      "type": "integer"
+                    },
+                    "replies": {
+                      "items": {
+                        "additionalProperties": false,
+                        "properties": {
+                          "at": {
+                            "type": "string"
+                          },
+                          "by": {
+                            "type": "string"
+                          },
+                          "snapshot": {
+                            "type": [
+                              "string",
+                              "null"
+                            ]
+                          },
+                          "text": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "by",
+                          "text",
+                          "at",
+                          "snapshot"
+                        ],
+                        "type": "object"
+                      },
+                      "type": "array"
+                    },
+                    "since": {
+                      "anyOf": [
+                        {
+                          "additionalProperties": false,
+                          "properties": {
+                            "snapshot": {
+                              "type": "string"
+                            }
+                          },
+                          "required": [
+                            "snapshot"
+                          ],
+                          "type": "object"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "The snapshot that changed its quoted lines after it was written"
+                    },
+                    "tag": {
+                      "description": "change, question or note: the person's own",
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "tag",
+                    "body",
+                    "anchor",
+                    "since",
+                    "replies"
+                  ],
+                  "type": "object"
+                },
+                "type": "array"
+              },
+              "id": {
+                "maximum": 9007199254740991,
+                "minimum": -9007199254740991,
+                "type": "integer"
+              },
+              "moreUnviewed": {
+                "maximum": 9007199254740991,
+                "minimum": -9007199254740991,
+                "type": "integer"
+              },
+              "range": {
+                "anyOf": [
+                  {
+                    "additionalProperties": false,
+                    "properties": {
+                      "base": {
+                        "type": [
+                          "string",
+                          "null"
+                        ]
+                      },
+                      "head": {
+                        "type": "string"
+                      },
+                      "label": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "label",
+                      "base",
+                      "head"
+                    ],
+                    "type": "object"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The range open in Changes at the Send; null when none was"
+              },
+              "unviewed": {
+                "anyOf": [
+                  {
+                    "items": {
+                      "type": "string"
+                    },
+                    "type": "array"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Files of that range the person had not viewed then, at most 20"
+              }
+            },
+            "required": [
+              "id",
+              "at",
+              "range",
+              "unviewed",
+              "moreUnviewed",
+              "comments"
+            ],
+            "type": "object"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "repo",
+        "sends"
+      ],
+      "type": "object"
+    },
+    "title": "Read the review comments"
+  },
+  {
+    "annotations": {
+      "destructiveHint": false,
+      "idempotentHint": false,
+      "openWorldHint": false,
+      "readOnlyHint": false
+    },
+    "description": "Reply to one review comment the person sent from ShadowGit, by its id from get_review_comments: what you changed for it, or your answer to its question, in a sentence or two. ShadowGit shows the reply under the comment with your name and the snapshot that holds your change; during a session, that is the snapshot its checkpoint or its end makes. A reply leaves the comment open: only the person resolves it. Needs the ShadowGit app running.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "properties": {
+        "id": {
+          "description": "The comment's id, as get_review_comments gives it",
+          "exclusiveMinimum": 0,
+          "maximum": 9007199254740991,
+          "type": "integer"
+        },
+        "repo": {
+          "description": "Project name or absolute path. Defaults to the current project.",
+          "minLength": 1,
+          "type": "string"
+        },
+        "text": {
+          "description": "What you changed for it, or your answer: at most 1,000 characters",
+          "maxLength": 1000,
+          "minLength": 1,
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "text"
+      ],
+      "type": "object"
+    },
+    "name": "reply_to_review_comment",
+    "outputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "maximum": 9007199254740991,
+          "minimum": -9007199254740991,
+          "type": "integer"
+        },
+        "reply": {
+          "additionalProperties": false,
+          "properties": {
+            "at": {
+              "type": "string"
+            },
+            "by": {
+              "type": "string"
+            },
+            "snapshot": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "text": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "by",
+            "text",
+            "at",
+            "snapshot"
+          ],
+          "type": "object"
+        },
+        "repo": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "repo",
+        "id",
+        "reply"
+      ],
+      "type": "object"
+    },
+    "title": "Reply to a review comment"
   }
 ]

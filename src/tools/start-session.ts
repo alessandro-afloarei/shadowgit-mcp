@@ -3,9 +3,18 @@ import * as z from 'zod/v4';
 import { clientName } from '../client-name.js';
 import { resolveRepo } from '../repos.js';
 import { activeSessions, startSession as startAppSession } from '../session-api.js';
-import { dataResult, repoParam } from './shared.js';
+import { dataResult, plural, repoParam } from './shared.js';
 
-const Output = z.object({ session_id: z.string(), repo: z.string(), already_active: z.boolean() });
+const Output = z.object({
+  session_id: z.string(),
+  repo: z.string(),
+  already_active: z.boolean(),
+  review: z.string().optional().describe('When the person has sent review comments still open: how many, and when to read them'),
+});
+
+/** The person's open review comments, named as a session starts: read when they ask, so an old one never steers a new task. */
+const reviewOf = (count: number) =>
+  `The person sent ${plural(count, 'review comment')} on this project. Read ${count === 1 ? 'it' : 'them'} with get_review_comments when they ask you to address their review.`;
 
 export async function startSession({ description, repo }: { description: string; repo?: string }, client: string): Promise<CallToolResult> {
   const project = resolveRepo(repo);
@@ -17,11 +26,12 @@ export async function startSession({ description, repo }: { description: string;
       { session_id: existing.id, repo: project.name, already_active: true },
     );
   }
-  const { sessionId: id } = await startAppSession(project.path, description, client);
+  const { sessionId: id, openComments } = await startAppSession(project.path, description, client);
+  const review = openComments > 0 ? reviewOf(openComments) : undefined;
   return dataResult(
     Output,
-    `Started session ${id} on ${project.name}. Automatic snapshots are paused until end_session.`,
-    { session_id: id, repo: project.name, already_active: false },
+    [`Started session ${id} on ${project.name}. Automatic snapshots are paused until end_session.`, ...(review === undefined ? [] : [review])].join(' '),
+    { session_id: id, repo: project.name, already_active: false, ...(review !== undefined && { review }) },
   );
 }
 
