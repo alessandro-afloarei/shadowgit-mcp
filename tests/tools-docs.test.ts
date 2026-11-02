@@ -26,6 +26,8 @@ beforeEach(() => {
   app.docsStatus = 200;
   app.docsAnswer = DOCS_ANSWERS.session;
   app.docsWritten = null;
+  app.answers = {};
+  app.statuses = {};
 });
 
 const docsAsked = () => app.requests.filter((request) => request.path.startsWith('/docs?')).map((request) => request.path);
@@ -174,6 +176,29 @@ describe('get_docs', () => {
     expect(textOf(await getDocs({ all: true }))).toBe("Every page of webshop's map has words.");
   });
 
+  it('asks for the pages of a range', async () => {
+    app.docsAnswer = DOCS_ANSWERS.range;
+    const result = await getDocs({ base: 'b'.repeat(40), head: 'c'.repeat(40) });
+    await getDocs({ base: null, head: 'c'.repeat(40) });
+    expect(docsAsked()).toEqual([
+      `/docs?${new URLSearchParams({ repoPath: project, base: 'b'.repeat(40), head: 'c'.repeat(40) })}`,
+      `/docs?${new URLSearchParams({ repoPath: project, base: '', head: 'c'.repeat(40) })}`,
+    ]);
+    const { head } = DOCS_ANSWERS.range as { head: string };
+    expect(result.structuredContent).toEqual(asGiven(DOCS_ANSWERS.range, step('src/api, src/billing and src/jobs', head)));
+    app.docsAnswer = { ...DOCS_ANSWERS.range, pages: [] };
+    expect(textOf(await getDocs({ base: null, head: 'c'.repeat(40) }))).toBe('The range changed no area of webshop whose docs page needs words.');
+  });
+
+  it('refuses half a range, or a range with areas or all, before asking the app', async () => {
+    await expect(getDocs({ head: 'c'.repeat(40) })).rejects.toThrow('Pass base and head together.');
+    await expect(getDocs({ base: null })).rejects.toThrow('Pass base and head together.');
+    for (const mixed of [{ areas: ['src/billing'] }, { overview: true }, { all: true }, { more: { after: 6, map: 'm' } }]) {
+      await expect(getDocs({ base: null, head: 'c'.repeat(40), ...mixed })).rejects.toThrow('Ask for a range, name areas, or ask for all: one of them.');
+    }
+    expect(app.requests).toEqual([]);
+  });
+
   it('refuses all with areas, and says what the app answers while it counts', async () => {
     await expect(getDocs({ all: true, areas: ['src/billing'] })).rejects.toThrow('Ask for all, or name areas and the overview: not both.');
     await expect(getDocs({ more: { after: 6, map: 'm' }, overview: true })).rejects.toThrow('Ask for all, or name areas and the overview: not both.');
@@ -225,35 +250,37 @@ describe('write_docs', () => {
     expect(app.requests).toEqual([]);
   });
 
-  it("leaves out a page past the app's rules for words, with why, and sends the others", async () => {
-    const words = (count: number) => Array.from({ length: count }, (_, i) => `word${i}`).join(' ');
+  it('sends every page, and names the pages the app left out, with why', async () => {
+    app.docsWritten = DOCS_ANSWERS.writtenLeft;
+    const body = ['It charges cards and records the payments in the ledger.'];
     const result = await writeDocs(
       {
         head: HEAD,
         pages: [
-          { area: 'src/billing', summary: 'x'.repeat(201), body: ['Charges cards.'] },
-          { area: 'src/api', summary: 'Routes requests.', body: [[{ ...link, area: 'src/api' }]] },
-          { area: 'src/jobs', summary: 'Retries charges.', body: [[], ''] },
-          // A paragraph ends its last word; pieces join without a space, as the app reads them
-          { area: 'src/admin', summary: 'Admin tools.', body: [words(200), [{ text: words(199) }, { text: ' ' }, { text: 'last', area: 'src/jobs' }], 'over'] },
-          { overview: true, summary: '  A small webshop.  ', body: [words(200), [{ text: words(199) }, { text: ' ' }, { text: 'last', area: 'src/jobs' }]] },
+          { area: 'src/billing', summary: 'Charges cards and keeps the ledger.', body },
+          { area: 'src/jobs', summary: 'x'.repeat(201), body },
+          { area: 'src/api', summary: 'Serves the cart, orders and users.', body },
         ],
       },
       'Claude Code',
     );
     const [sent] = app.requestsTo('/docs') as { pages: object[] }[];
-    expect(sent?.pages).toEqual([{ overview: true, words: { summary: 'A small webshop.', body: [[{ text: words(200) }], [{ text: words(199) }, { text: ' ' }, { text: 'last', area: 'src/jobs' }]] } }]);
+    expect(sent?.pages).toHaveLength(3);
+    expect(sent?.pages[1]).toEqual({ area: 'src/jobs', words: { summary: 'x'.repeat(201), body: [[{ text: body[0] }]] } });
+    expect(result.structuredContent).toEqual({ repo: 'webshop', ...DOCS_ANSWERS.writtenLeft });
+    const { head } = DOCS_ANSWERS.writtenLeft as { head: string };
     expect(textOf(result)).toBe(
-      'ShadowGit keeps your words for the Overview, at snapshot f62bdb89. Left out: src/billing: summary: at most 200 characters; src/api: body.0.0: links a symbol or an area, not both; src/jobs: body.0: a paragraph has pieces; body.1.0.text: a piece has text; src/admin: the body has 401 words: write at most 400.',
+      `ShadowGit keeps your words for src/billing and src/api, at snapshot ${head.slice(0, 8)}. Left out: src/jobs: ✖ Too big: expected string to have <=200 characters\n  → at words.summary.`,
     );
-    expect(result.structuredContent).toMatchObject({ pages: [{ page: { overview: true }, kept: true }, { page: { area: 'src/billing' }, kept: false }, {}, {}, {}] });
     expect(textOf(result)).not.toMatch(JUDGING);
   });
 
-  it('sends nothing when every page is left out', async () => {
-    const result = await writeDocs({ head: HEAD, pages: [{ area: 'src/billing', summary: '   ', body: ['Charges cards.'] }] }, 'Claude Code');
-    expect(app.requests).toEqual([]);
-    expect(textOf(result)).toBe('ShadowGit kept no words. Left out: src/billing: summary: one sentence, not empty.');
+  it("passes on the app's reason when it keeps no page", async () => {
+    app.answers['/docs'] = { success: false, error: 'No page to keep: src/jobs: ✖ Too big: expected string to have <=200 characters' };
+    app.statuses['/docs'] = 400;
+    await expect(writeDocs({ head: HEAD, pages: [{ area: 'src/jobs', summary: 'x'.repeat(201), body: ['Retries.'] }] }, 'Claude Code')).rejects.toThrow(
+      'ShadowGit: No page to keep: src/jobs',
+    );
   });
 
   it('both tools say an app without docs needs updating', async () => {

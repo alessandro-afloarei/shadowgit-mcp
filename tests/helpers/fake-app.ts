@@ -65,8 +65,10 @@ export interface FakeApp {
   commentRoutes: boolean;
   /** What GET /comments answers; a reply to one of its comments answers it again with the reply, as the app stores it. */
   commentsAnswer: CommentsWire;
-  /** A body that answers a route (its path, without the query) with 200 in place of its usual one: a newer app's shape. */
+  /** A body that answers a route (its path, without the query) in place of its usual one: a newer app's shape, or a refusal. */
   answers: Partial<Record<string, object>>;
+  /** The status an `answers` body goes with: 200 unless named. */
+  statuses: Partial<Record<string, number>>;
   /** Leaves every request unanswered, like an app busy with a large project. */
   hang: boolean;
   /** Sends the headers and part of the body, then never ends it, like an app that stalls mid-answer. */
@@ -224,6 +226,7 @@ async function listen(): Promise<FakeApp> {
     lensRoutes: true,
     lensAnswer: { range: FAKE_RANGE, lens: FAKE_LENS },
     answers: {},
+    statuses: {},
     commentRoutes: true,
     commentsAnswer: { sends: [] },
     docsRoutes: false,
@@ -265,8 +268,9 @@ async function listen(): Promise<FakeApp> {
       res.end(html);
     };
 
-    const answer = app.answers[route.split('?')[0] ?? route];
-    if (answer !== undefined) return json(200, answer);
+    const path = route.split('?')[0] ?? route;
+    const answer = app.answers[path];
+    if (answer !== undefined) return json(app.statuses[path] ?? 200, answer);
     if (route === '/session/active') {
       return json(200, { success: true, sessions: app.sessions.map((s) => ({ ...s, aiTool: 'test', duration: 0 })) });
     }

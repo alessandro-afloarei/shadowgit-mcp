@@ -3158,7 +3158,7 @@
           "type": "array"
         },
         "next": {
-          "description": "The step that follows: the docs pages the session changed",
+          "description": "The step that follows: the docs pages the range changed",
           "type": "string"
         },
         "repo": {
@@ -3181,7 +3181,7 @@
       "openWorldHint": false,
       "readOnlyHint": true
     },
-    "description": "Read the docs pages ShadowGit keeps for a tracked project: one per area of its map, plus an Overview, each written by an AI assistant. A page comes with the facts ShadowGit draws from the map (folder, sizes, layers, what it depends on and what depends on it, processes, its most depended-on symbols, the project's rules that name it), its words so far with who wrote them and at which snapshot, and what changed in the area since them: symbols changed in their code, dependency facts, links that no longer name anything. With no arguments: the pages the latest AI session changed whose words are missing or behind. With areas, and overview: those pages. With all: pages without words, largest area first, five at a time, with more for the following batch. Answers head, the snapshot write_docs keeps the words at, and next: write the pages' words with write_docs. Needs the ShadowGit app running.",
+    "description": "Read the docs pages ShadowGit keeps for a tracked project: one per area of its map, plus an Overview, each written by an AI assistant. A page comes with the facts ShadowGit draws from the map (folder, sizes, layers, what it depends on and what depends on it, processes, its most depended-on symbols, the project's rules that name it), its words so far with who wrote them and at which snapshot, and what changed in the area since them: symbols changed in their code, dependency facts, links that no longer name anything. With no arguments: the pages the latest AI session changed whose words are missing or behind. With base and head: the pages that range changed whose words are missing or behind. With areas, and overview: those pages. With all: pages without words, largest area first, five at a time, with more for the following batch. Answers head, the snapshot write_docs keeps the words at, and next: write the pages' words with write_docs. Needs the ShadowGit app running.",
     "inputSchema": {
       "$schema": "https://json-schema.org/draft/2020-12/schema",
       "properties": {
@@ -3197,6 +3197,23 @@
           },
           "maxItems": 20,
           "type": "array"
+        },
+        "base": {
+          "anyOf": [
+            {
+              "pattern": "^[0-9a-f]{7,40}$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "With head: the pages this range changed, as get_lens names a range; null from the start of the history"
+        },
+        "head": {
+          "description": "With base: the end of the range",
+          "pattern": "^[0-9a-f]{7,40}$",
+          "type": "string"
         },
         "more": {
           "description": "The more get_docs answered with all, as given: the following batch",

@@ -24,6 +24,8 @@ type Facts = NonNullable<Page['facts']>;
 type Words = z.infer<typeof DocWords>;
 
 const BOTH = 'Ask for all, or name areas and the overview: not both.';
+const HALF_RANGE = 'Pass base and head together.';
+const ONE_ASK = 'Ask for a range, name areas, or ask for all: one of them.';
 
 /** A page as the answers name it: the Overview, or an area by its id. */
 export const pageName = (key: z.infer<typeof DocKey>) => ('area' in key ? key.area : 'the Overview');
@@ -115,10 +117,17 @@ function writeStep({ head, limits, pages, next: more }: Read): string | undefine
   return `Write the words of ${andList(asked.map(({ page }) => pageName(page)))} with write_docs, head ${JSON.stringify(head)}: ${words}.${following}`;
 }
 
-function describeDocs(repo: string, read: Read, all: boolean, step: string | undefined): string {
-  if (read.pages.length === 0) {
-    return all ? `Every page of ${repo}'s map has words.` : `The latest AI session in ${repo} changed no area whose docs page needs words.`;
-  }
+/** What an answer with no page asked for: the latest session's pages, a range's, or all of them. The app answers every page named. */
+type Ask = 'session' | 'range' | 'all';
+
+const NONE: Record<Ask, (repo: string) => string> = {
+  session: (repo) => `The latest AI session in ${repo} changed no area whose docs page needs words.`,
+  range: (repo) => `The range changed no area of ${repo} whose docs page needs words.`,
+  all: (repo) => `Every page of ${repo}'s map has words.`,
+};
+
+function describeDocs(repo: string, read: Read, ask: Ask, step: string | undefined): string {
+  if (read.pages.length === 0) return NONE[ask](repo);
   return [
     `${repo}'s docs pages, at snapshot ${read.head.slice(0, 8)}; the map is ${drawnFrom(read.mapAsOf)}`,
     ...read.pages.flatMap((page) => ['', ...pageLines(page)]),
@@ -127,12 +136,16 @@ function describeDocs(repo: string, read: Read, all: boolean, step: string | und
 }
 
 export async function getDocs({
+  base,
+  head,
   areas = [],
   overview = false,
   all = false,
   more,
   repo,
 }: {
+  base?: string | null;
+  head?: string;
   areas?: string[];
   overview?: boolean;
   all?: boolean;
@@ -141,14 +154,20 @@ export async function getDocs({
 }): Promise<CallToolResult> {
   // more goes on from all's answer: it is a batch of all
   const batch = all || more !== undefined;
-  if (batch && (areas.length > 0 || overview)) throw new Error(BOTH);
+  const named = areas.length > 0 || overview;
+  if (batch && named) throw new Error(BOTH);
+  // A base of null is a range from the start of the history: only a base left out is half a range
+  const ranged = base !== undefined || head !== undefined;
+  if (ranged && (base === undefined || head === undefined)) throw new Error(HALF_RANGE);
+  if (ranged && (batch || named)) throw new Error(ONE_ASK);
   const project = resolveRepo(repo);
-  const read = await readDocs({ repoPath: project.path, areas, overview, all: batch, next: more });
+  const read = await readDocs({ repoPath: project.path, base, head, areas, overview, all: batch, next: more });
   // Another project's steps name it: get_docs with more, or write_docs, without repo would read the current one
   const written = writeStep(read);
   const step = written === undefined ? undefined : `${forProject(repo, project)}${written}`;
   const { next: cursor, ...rest } = read;
-  return dataResult(DocsOutput, describeDocs(project.name, read, batch, step), { repo: project.name, ...rest, more: cursor, ...(step !== undefined && { next: step }) });
+  const ask: Ask = ranged ? 'range' : batch ? 'all' : 'session';
+  return dataResult(DocsOutput, describeDocs(project.name, read, ask, step), { repo: project.name, ...rest, more: cursor, ...(step !== undefined && { next: step }) });
 }
 
 // code-graph's DOC_LIMITS, which get_docs answers as limits
@@ -167,32 +186,8 @@ const PageInput = z.object({
     .describe('Short paragraphs on how it works: each plain text, or pieces, a piece linking a symbol (file and name) or an area (id) where its text names it'),
 });
 
-/** The app's rules for a page's words (code-graph's DocWordsSchema), checked a page at a time: one page past them never costs the others. */
-const AppWords = z.object({
-  summary: z.string().trim().min(1, 'one sentence, not empty').max(SUMMARY_MAX, `at most ${SUMMARY_MAX} characters`),
-  body: z.array(
-    z
-      .array(
-        z
-          .object({
-            text: z.string().min(1, 'a piece has text'),
-            symbol: z.object({ file: z.string().min(1, 'a symbol names its file'), name: z.string().min(1, 'a symbol has a name') }).optional(),
-            area: z.string().min(1, "an area's id").optional(),
-          })
-          .refine((piece) => piece.symbol === undefined || piece.area === undefined, 'links a symbol or an area, not both'),
-      )
-      .min(1, 'a paragraph has pieces'),
-  ),
-});
-
-/** A body's words as the app counts them: a paragraph's pieces read as one text, and a paragraph ends its last word. */
-const bodyWords = (body: readonly (readonly { text: string }[])[]) =>
-  body.map((pieces) => pieces.map((piece) => piece.text).join('')).join(' ').split(/\s+/).filter(Boolean).length;
-
-type Left = { page: z.infer<typeof DocKey>; kept: false; reason: string };
-
-/** A page as the app takes it, or left out with why when its words are past the app's rules; throws for a page no app could read. */
-function appPage({ area, overview, holds, summary, body }: z.infer<typeof PageInput>, place: number): AppDocWrite | Left {
+/** A page as the app takes it; throws for a page no app could read. The app checks each page's words on its own. */
+function appPage({ area, overview, holds, summary, body }: z.infer<typeof PageInput>, place: number): AppDocWrite {
   const page = `Page ${place + 1}`;
   if (area !== undefined && overview) throw new Error(`${page} names an area and the overview: name one.`);
   const key = overview ? { overview: true as const } : area !== undefined ? { area } : null;
@@ -205,26 +200,24 @@ function appPage({ area, overview, holds, summary, body }: z.infer<typeof PageIn
     throw new Error(`${page} sends neither words (a summary and a body) nor holds: send words, or holds: true where its words still hold.`);
   }
   // A plain paragraph is one piece of text
-  const words = AppWords.safeParse({ summary, body: body.map((pieces) => (typeof pieces === 'string' ? [{ text: pieces }] : pieces)) });
-  if (!words.success) return { page: key, kept: false, reason: words.error.issues.map(({ path, message }) => `${path.join('.')}: ${message}`).join('; ') };
-  const count = bodyWords(words.data.body);
-  if (count > BODY_WORDS_MAX) return { page: key, kept: false, reason: `the body has ${count} words: write at most ${BODY_WORDS_MAX}` };
-  return { ...key, words: words.data };
+  return { ...key, words: { summary, body: body.map((pieces) => (typeof pieces === 'string' ? [{ text: pieces }] : pieces)) } };
 }
 
 export async function writeDocs({ head, pages, repo }: { head: string; pages: z.infer<typeof PageInput>[]; repo?: string }, author: string): Promise<CallToolResult> {
-  const checked = pages.map(appPage);
-  const sent = checked.filter((page): page is AppDocWrite => !('kept' in page));
+  const sent = pages.map(appPage);
   const project = resolveRepo(repo);
-  const answered = sent.length === 0 ? { head, pages: [] } : await sendDocs({ repoPath: project.path, head, author, pages: sent });
-  const written = { head: answered.head, pages: [...answered.pages, ...checked.filter((page): page is Left => 'kept' in page)] };
+  const written = await sendDocs({ repoPath: project.path, head, author, pages: sent });
   const at = written.head.slice(0, 8);
   const kept = written.pages.filter((page) => page.kept);
-  const left = written.pages.filter((page) => !page.kept);
+  // Left out: pages the app refused once it read the map, and, from 0.4.0, those whose words were past its rules
+  const left = [
+    ...written.pages.flatMap((page) => (page.kept ? [] : [`${pageName(page.page)}: ${page.reason}`])),
+    ...(written.left ?? []).map(({ page, why }) => `${page === null ? 'a page' : pageName(page)}: ${why}`),
+  ];
   const text = [
     kept.length > 0 ? `ShadowGit keeps your words for ${andList(kept.map(({ page }) => pageName(page)))}, at snapshot ${at}.` : 'ShadowGit kept no words.',
     ...kept.flatMap(({ page, dropped }) => (dropped.length > 0 ? [`Made plain text in ${pageName(page)}, naming nothing at ${at}: ${dropped.join('; ')}.`] : [])),
-    ...(left.length > 0 ? [`Left out: ${left.map(({ page, reason }) => `${pageName(page)}: ${reason}`).join('; ')}.`] : []),
+    ...(left.length > 0 ? [`Left out: ${left.join('; ')}.`] : []),
   ].join(' ');
   return dataResult(WrittenOutput, text, { repo: project.name, ...written });
 }
@@ -235,8 +228,10 @@ export function registerDocs(server: McpServer): void {
     {
       title: 'Read docs pages',
       description:
-        "Read the docs pages ShadowGit keeps for a tracked project: one per area of its map, plus an Overview, each written by an AI assistant. A page comes with the facts ShadowGit draws from the map (folder, sizes, layers, what it depends on and what depends on it, processes, its most depended-on symbols, the project's rules that name it), its words so far with who wrote them and at which snapshot, and what changed in the area since them: symbols changed in their code, dependency facts, links that no longer name anything. With no arguments: the pages the latest AI session changed whose words are missing or behind. With areas, and overview: those pages. With all: pages without words, largest area first, five at a time, with more for the following batch. Answers head, the snapshot write_docs keeps the words at, and next: write the pages' words with write_docs. Needs the ShadowGit app running.",
+        "Read the docs pages ShadowGit keeps for a tracked project: one per area of its map, plus an Overview, each written by an AI assistant. A page comes with the facts ShadowGit draws from the map (folder, sizes, layers, what it depends on and what depends on it, processes, its most depended-on symbols, the project's rules that name it), its words so far with who wrote them and at which snapshot, and what changed in the area since them: symbols changed in their code, dependency facts, links that no longer name anything. With no arguments: the pages the latest AI session changed whose words are missing or behind. With base and head: the pages that range changed whose words are missing or behind. With areas, and overview: those pages. With all: pages without words, largest area first, five at a time, with more for the following batch. Answers head, the snapshot write_docs keeps the words at, and next: write the pages' words with write_docs. Needs the ShadowGit app running.",
       inputSchema: z.object({
+        base: Snapshot.nullable().optional().describe('With head: the pages this range changed, as get_lens names a range; null from the start of the history'),
+        head: Snapshot.optional().describe('With base: the end of the range'),
         areas: z.array(z.string().min(1)).max(20).optional().describe("Area ids, as get_docs names them: most are the area's folder, as get_map lists it"),
         overview: z.boolean().optional().describe('The Overview page, alone or with areas'),
         all: z.boolean().optional().describe('Pages without words, five at a time'),

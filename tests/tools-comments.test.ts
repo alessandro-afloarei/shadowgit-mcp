@@ -26,6 +26,7 @@ beforeEach(() => {
   app.requests.length = 0;
   app.commentRoutes = true;
   app.commentsAnswer = COMMENT_ANSWERS.open;
+  app.answers = {};
 });
 
 const sends = (answer: CommentsWire) => answer.sends.map(({ id, at, range, unviewed, moreUnviewed, comments }) => ({
@@ -118,7 +119,6 @@ describe('reply_to_review_comment', () => {
     app.answers['/comments/reply'] = COMMENT_ANSWERS.reply;
     const stamped = await replyToReviewComment({ id: 2, text: 'It rounds a fractional discount to whole cents.' }, 'Claude Code');
     expect(textOf(stamped)).toBe(`Your reply is under comment #2 in ShadowGit, at snapshot ${short(COMMENT_ANSWERS.reply.reply.snapshot)}.`);
-    delete app.answers['/comments/reply'];
   });
 
   it("passes on the app's reason for a comment that is not open", async () => {
