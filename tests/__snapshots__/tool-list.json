@@ -4269,6 +4269,59 @@
         "head": {
           "type": "string"
         },
+        "left": {
+          "description": "Pages left out before they were kept: their words past the app's rules",
+          "items": {
+            "additionalProperties": false,
+            "properties": {
+              "page": {
+                "anyOf": [
+                  {
+                    "anyOf": [
+                      {
+                        "additionalProperties": false,
+                        "properties": {
+                          "area": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "area"
+                        ],
+                        "type": "object"
+                      },
+                      {
+                        "additionalProperties": false,
+                        "properties": {
+                          "overview": {
+                            "const": true,
+                            "type": "boolean"
+                          }
+                        },
+                        "required": [
+                          "overview"
+                        ],
+                        "type": "object"
+                      }
+                    ]
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "why": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "page",
+              "why"
+            ],
+            "type": "object"
+          },
+          "type": "array"
+        },
         "pages": {
           "items": {
             "anyOf": [

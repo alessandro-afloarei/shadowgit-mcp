@@ -1,4 +1,5 @@
 import * as z from 'zod/v4';
+import { CommentReply, CommentsRead } from './comment-shapes.js';
 import { DocsRead, DocsWritten, type DocKey, type DocsCursor, type DocWords } from './doc-shapes.js';
 import { AreaRead, ContextRead, SummaryRead } from './map-shapes.js';
 import { CheckpointRules, Range, RuleCheck, RulesFailure } from './rule-shapes.js';
@@ -29,6 +30,9 @@ const APP_TOO_OLD = "This version of ShadowGit can't create checkpoints for AI a
 const APP_WITHOUT_LENS = 'This version of ShadowGit has no Lens for AI assistants. Ask the user to update the ShadowGit app.';
 const APP_WITHOUT_MAP = 'This version of ShadowGit has no map for AI assistants. Ask the user to update the ShadowGit app.';
 export const APP_WITHOUT_DOCS = 'This version of ShadowGit has no docs pages for AI assistants. Ask the user to update the ShadowGit app.';
+export const APP_WITHOUT_COMMENTS = 'This version of ShadowGit has no review comments for AI assistants. Ask the user to update the ShadowGit app.';
+// What every app answers a route it doesn't have; a route's own 404 gives its reason
+const NO_ROUTE = 'Not found';
 const CHECK_UNREAD = "ShadowGit checked this checkpoint against the project's rules and answered in a shape this version of shadowgit-mcp-server does not read. Ask the user to update shadowgit-mcp-server.";
 const APP_WITHOUT_PIECES = "This version of ShadowGit reads a step's body as plain text only: ask the user to update the ShadowGit app, or send each body as plain text.";
 
@@ -40,7 +44,8 @@ const Session = z.object({
   startedAt: z.string().transform((utc) => toLocalIso(new Date(`${utc.replace(' ', 'T')}Z`))),
 });
 const Sessions = z.object({ sessions: z.array(Session) });
-const StartedSession = z.object({ sessionId: z.string() });
+// From ShadowGit 0.4.0 the app counts the review comments the person sent that are still open, when there are some
+const StartedSession = z.object({ sessionId: z.string(), openComments: z.number().int().optional() });
 // From ShadowGit 0.3.13 the app takes a session's unsaved edits into a snapshot as it ends, and answers it
 const EndedSession = z.object({ commit: z.string().optional() });
 // The checkpoint is saved whatever shape its check comes in: one this version can't read reads as failed
@@ -155,7 +160,7 @@ async function request(
 }
 
 /** An answer in the shape this version reads: one of another shape asks for a server update, not a parse error. */
-function read<S extends z.ZodType>(shape: S, json: unknown, what: 'map' | 'lens' | 'session' | 'checkpoint' | 'docs page'): z.infer<S> {
+function read<S extends z.ZodType>(shape: S, json: unknown, what: 'map' | 'lens' | 'session' | 'checkpoint' | 'docs page' | 'review comment'): z.infer<S> {
   const parsed = shape.safeParse(json);
   if (!parsed.success) throw new Error(`ShadowGit answered with a ${what} this version of shadowgit-mcp-server does not read. Ask the user to update shadowgit-mcp-server.`, { cause: parsed.error });
   return parsed.data;
@@ -171,9 +176,11 @@ export async function activeSessions(): Promise<ActiveSession[]> {
   return read(Sessions, json, 'session').sessions;
 }
 
-export async function startSession(repoPath: string, description: string, aiTool: string): Promise<string> {
+/** The session started, and how many review comments the person sent that are still open: 0 from an app before 0.4.0. */
+export async function startSession(repoPath: string, description: string, aiTool: string): Promise<{ sessionId: string; openComments: number }> {
   const { json } = await request('/session/start', { repoPath, description, aiTool });
-  return read(StartedSession, json, 'session').sessionId;
+  const { sessionId, openComments = 0 } = read(StartedSession, json, 'session');
+  return { sessionId, openComments };
 }
 
 /** The snapshot the session ended at, holding the edits it never checkpointed; undefined from an app before 0.3.13. */
@@ -255,11 +262,14 @@ export function readCodeContext(input: { repoPath: string; files?: string[]; sym
 export type AppDocWrite = z.infer<typeof DocKey> & ({ words: z.infer<typeof DocWords> } | { holds: true });
 
 /**
- * Docs pages for the agent to word: without areas or all, the latest AI session's that need words; with areas and
- * overview, those; with all, a batch of those without words, from `next`. The app may count changes in the request.
+ * Docs pages for the agent to word: without areas or all, the latest AI session's that need words; with head, those of
+ * the range from base; with areas and overview, those; with all, a batch of those without words, from `next`. The app
+ * may count changes in the request.
  */
 export async function readDocs(input: {
   repoPath: string;
+  base?: string | null;
+  head?: string;
   areas?: string[];
   overview?: boolean;
   all?: boolean;
@@ -270,6 +280,11 @@ export async function readDocs(input: {
   for (const area of input.areas ?? []) query.append('area', area);
   if (input.overview) query.set('overview', 'true');
   if (input.all) query.set('all', 'true');
+  // An empty base is the empty tree, as for the Lens
+  if (input.head !== undefined) {
+    query.set('base', input.base ?? '');
+    query.set('head', input.head);
+  }
   if (input.next !== undefined) {
     query.set('after', String(input.next.after));
     query.set('map', input.next.map);
@@ -284,4 +299,27 @@ export async function sendDocs(input: { repoPath: string; head: string; author: 
   const { status, json } = await request('/docs', input, { timeoutMs: SLOW_REQUEST_TIMEOUT_MS, accept: [404] });
   if (status === 404) throw new Error(APP_WITHOUT_DOCS);
   return read(DocsWritten, json, 'docs page');
+}
+
+/** The review comments the person sent that are still open, by the Send that carried them, oldest first. */
+export async function readComments(repoPath: string): Promise<z.infer<typeof CommentsRead>> {
+  const { status, json } = await request(`/comments?${new URLSearchParams({ repoPath })}`, undefined, { timeoutMs: SLOW_REQUEST_TIMEOUT_MS, accept: [404] });
+  if (status === 404) throw new Error(APP_WITHOUT_COMMENTS);
+  return read(CommentsRead, json, 'review comment');
+}
+
+/** The agent's reply to one open comment, as the app stored it; a comment never sent, or resolved, is refused with why. */
+export async function replyToComment(input: { repoPath: string; id: number; text: string; author: string }): Promise<z.infer<typeof CommentReply>> {
+  const { status, json } = await request('/comments/reply', input, { timeoutMs: SLOW_REQUEST_TIMEOUT_MS, accept: [404] }).catch((error: unknown) => {
+    if (!(error instanceof AppTimeoutError)) throw error;
+    throw new Error(
+      `ShadowGit did not answer within ${SLOW_REQUEST_TIMEOUT_MS / 1_000} s; the reply may still be stored. Read the comment with get_review_comments before replying again.`,
+      { cause: error },
+    );
+  });
+  if (status === 404) {
+    const refused = ErrorReply.safeParse(json);
+    throw refused.success && refused.data.error !== NO_ROUTE ? failure(status, json) : new Error(APP_WITHOUT_COMMENTS);
+  }
+  return read(z.object({ reply: CommentReply }), json, 'review comment').reply;
 }

@@ -61,6 +61,10 @@ export interface FakeApp {
   docsAnswer: object;
   /** What POST /docs answers; null keeps every page sent, dropping no link, at the head sent. */
   docsWritten: object | null;
+  /** False is an app before 0.4.0, without the comment routes: they answer the catch-all 404. */
+  commentRoutes: boolean;
+  /** What GET /comments answers; a reply to one of its comments answers it again with the reply, as the app stores it. */
+  commentsAnswer: CommentsWire;
   /** A body that answers a route (its path, without the query) with 200 in place of its usual one: a newer app's shape. */
   answers: Partial<Record<string, object>>;
   /** Leaves every request unanswered, like an app busy with a large project. */
@@ -163,6 +167,25 @@ export const DOCS_ANSWERS = {
   mapSummary: withoutSuccess(fixture('docs/map-summary')),
   context: withoutSuccess(fixture('docs/context')),
   all: withoutSuccess(fixture('docs/all')),
+  // The pages of the range of the session that added the webshop, read by its base and head; and a write of three
+  // pages, one with a 201-character summary, that the app kept two of
+  range: withoutSuccess(fixture('docs/range')),
+  writtenLeft: withoutSuccess(fixture('docs/written-left')),
+};
+/** GET /api/comments' answer, as the fake app reads and extends it: Sends of comments, each with its replies. */
+export type CommentsWire = { sends: (Record<string, unknown> & { comments: (Record<string, unknown> & { id: number; replies: unknown[] })[] })[] };
+/**
+ * The real app's comment answers for the map webshop, written on the snapshot of the session that added it: four
+ * comments, #3, #2 and #1 sent with that range open (a ledger of the files not viewed), and #4 sent with no range;
+ * then the same once #2 has a reply with its snapshot, #1 one waiting for its session's, and #3's line changed since.
+ * With them, a session's start counting them, a reply, and a reply to a comment that isn't open.
+ */
+export const COMMENT_ANSWERS = {
+  open: withoutSuccess(fixture('comments/open')) as CommentsWire,
+  answered: withoutSuccess(fixture('comments/answered')) as CommentsWire,
+  start: withoutSuccess(fixture('comments/start')) as { sessionId: string; openComments: number },
+  reply: withoutSuccess(fixture('comments/reply')) as { reply: Record<string, unknown> },
+  noComment: fixture('comments/no-comment') as { success: false; error: string },
 };
 /** The webshop the rules answers are of, its .shadowgit-rules included: path → content. */
 export const RULES_PROJECT = fixture('rules/project') as Record<string, string>;
@@ -201,6 +224,8 @@ async function listen(): Promise<FakeApp> {
     lensRoutes: true,
     lensAnswer: { range: FAKE_RANGE, lens: FAKE_LENS },
     answers: {},
+    commentRoutes: true,
+    commentsAnswer: { sends: [] },
     docsRoutes: false,
     docsStatus: 200,
     docsAnswer: DOCS_ANSWERS.session,
@@ -248,7 +273,8 @@ async function listen(): Promise<FakeApp> {
     if (route === '/session/start') {
       const id = `${String(body.aiTool).toLowerCase().replace(/\s+/g, '-')}-${nextId++}`;
       app.sessions.push(fakeSession({ id, repoPath: String(body.repoPath), description: String(body.description) }));
-      return json(200, { success: true, sessionId: id });
+      const open = app.commentRoutes ? app.commentsAnswer.sends.reduce((sum, send) => sum + send.comments.length, 0) : 0;
+      return json(200, { success: true, sessionId: id, ...(open > 0 && { openComments: open }) });
     }
     if (route === '/session/end') {
       app.sessions = app.sessions.filter((s) => s.id !== body.sessionId);
@@ -294,6 +320,22 @@ async function listen(): Promise<FakeApp> {
       const pages = (body.pages as Record<string, unknown>[]).map((page) => ({ page: 'overview' in page ? { overview: true } : { area: page.area }, kept: true, dropped: [] }));
       return json(200, { success: true, ...(app.docsWritten ?? { head: body.head, pages }) });
     }
+    if (app.commentRoutes && route.startsWith('/comments?')) return json(200, { success: true, ...app.commentsAnswer });
+    if (app.commentRoutes && route === '/comments/reply') {
+      const id = Number(body.id);
+      if (!app.commentsAnswer.sends.some((send) => send.comments.some((comment) => comment.id === id))) {
+        return json(404, { success: false, error: `There is no open comment #${id}: it was never sent, or is resolved` });
+      }
+      // As the app stores it: by the author named, outside a snapshot until the session's next one
+      const reply = { by: String(body.author), text: String(body.text), at: new Date().toISOString(), snapshot: null };
+      app.commentsAnswer = {
+        sends: app.commentsAnswer.sends.map((send) => ({
+          ...send,
+          comments: send.comments.map((comment) => (comment.id === id ? { ...comment, replies: [...comment.replies, reply] } : comment)),
+        })),
+      };
+      return json(200, { success: true, reply });
+    }
     if (app.mapRoutes && (route.startsWith('/map?') || route === '/map/context')) {
       if (app.mapStatus === 202) return json(202, { success: false, error: "ShadowGit is drawing this project's map; ask again in a minute" });
       if (app.mapStatus === 409) return json(409, { success: false, error: 'This project has no snapshot yet' });
@@ -306,7 +348,8 @@ async function listen(): Promise<FakeApp> {
       }
       return json(200, { success: true, ...(new URLSearchParams(route.slice('/map?'.length)).has('area') ? app.mapAnswer.area : app.mapAnswer.map) });
     }
-    json(404, { success: false, error: `No route ${route}` });
+    // Every app's answer to a route it doesn't have
+    json(404, { success: false, error: 'Not found' });
   });
 
   return app;

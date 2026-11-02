@@ -87,4 +87,6 @@ export const DocsWritten = z.object({
     z.object({ page: DocKey, kept: z.literal(true), dropped: z.array(z.string()).describe('Links made plain text, naming nothing at head') }),
     z.object({ page: DocKey, kept: z.literal(false), reason: z.string() }),
   ])),
+  // From ShadowGit 0.4.0 the app checks each page's words on its own, and leaves out those past its rules
+  left: z.array(z.object({ page: DocKey.nullable(), why: z.string() })).optional().describe("Pages left out before they were kept: their words past the app's rules"),
 });

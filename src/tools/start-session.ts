@@ -17,7 +17,7 @@ export async function startSession({ description, repo }: { description: string;
       { session_id: existing.id, repo: project.name, already_active: true },
     );
   }
-  const id = await startAppSession(project.path, description, client);
+  const { sessionId: id } = await startAppSession(project.path, description, client);
   return dataResult(
     Output,
     `Started session ${id} on ${project.name}. Automatic snapshots are paused until end_session.`,
