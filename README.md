@@ -10,9 +10,10 @@ changed and when, and can save its own edits as one named checkpoint instead of 
 - The ShadowGit app (0.3.4 or later for checkpoints, a release after 0.3.5 for the Lens, after 0.3.7 for its linked
   words, after 0.3.9 for the map, after 0.3.10 for the Lens's dependency facts, 0.3.11 or later for the project's
   rules, 0.3.13 or later for a session's unsaved edits in a snapshot as it ends and for the check of a checkpoint
-  that finds nothing new), tracking at least one project.
+  that finds nothing new, 0.4.0 or later for review comments and the docs pages of any range), tracking at least
+  one project.
   Reading history works while the app is closed;
-  sessions, checkpoints, the Lens and the map need it running.
+  sessions, checkpoints, the Lens, the map and review comments need it running.
 - Git on your PATH
 
 ## Setup
@@ -47,6 +48,7 @@ webshop") when ShadowGit tracks more than one.
 - "Write the Lens words for this session"
 - "What does the billing area do?"
 - "Document this project in ShadowGit"
+- "Address my ShadowGit review comments"
 
 ## Tools
 
@@ -63,6 +65,8 @@ webshop") when ShadowGit tracks more than one.
 | `write_lens_words` | Writes the Lens's words for that range, kept in the history, with links, a why and an excerpt |
 | `get_docs` | Reads the project's docs pages, one per map area plus an Overview: by default those the latest AI session changed that need words, each with its facts, its words so far and what changed since them |
 | `write_docs` | Writes pages' words, with links to symbols and areas, or keeps words that still hold; kept in the history, never in the project's files |
+| `get_review_comments` | Reads the review comments you sent from ShadowGit and haven't resolved, by Send, with their lines, words and replies |
+| `reply_to_review_comment` | Replies to one comment: ShadowGit shows the reply under it, with the snapshot that holds the change |
 
 The other tools work on the current project unless given `repo`.
 
