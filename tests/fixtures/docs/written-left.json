@@ -1,0 +1,28 @@
+{
+  "success": true,
+  "head": "ea91253cee9087fead98d21f7628096cd8d1e49a",
+  "pages": [
+    {
+      "page": {
+        "area": "src/billing"
+      },
+      "kept": true,
+      "dropped": []
+    },
+    {
+      "page": {
+        "area": "src/api"
+      },
+      "kept": true,
+      "dropped": []
+    }
+  ],
+  "left": [
+    {
+      "page": {
+        "area": "src/jobs"
+      },
+      "why": "✖ Too big: expected string to have <=200 characters\n  → at words.summary"
+    }
+  ]
+}
