@@ -18,6 +18,15 @@ interface Context {
   answer: string;
 }
 
+/** The comments the person sent on the webshop: with the ShadowGit tools alone, reading them is the step it can take. */
+const READS_COMMENTS = {
+  prepare: (app: FakeApp, project: string) => {
+    snapshot(project, MAP_PROJECT, 'Add the webshop');
+    app.commentsAnswer = COMMENT_ANSWERS.open;
+  },
+  passed: ({ app }: Context) => app.requests.some((request) => request.path.startsWith('/comments?')),
+};
+
 // The phrases as docs.shadowgit.com writes them; its example project is webshop, like the temporary one.
 const CASES: { phrase: string; prepare?: (app: FakeApp, project: string) => void; passed: (c: Context) => boolean }[] = [
   {
@@ -91,24 +100,9 @@ const CASES: { phrase: string; prepare?: (app: FakeApp, project: string) => void
     },
     passed: ({ app }) => docsAsked(app).some((query) => query.get('all') === 'true') && app.requestsTo('/docs').length > 0,
   },
-  {
-    phrase: 'Address my ShadowGit review comments',
-    // The comments the person sent on the webshop: with the ShadowGit tools alone, reading them is the step it can take
-    prepare: (app, project) => {
-      snapshot(project, MAP_PROJECT, 'Add the webshop');
-      app.commentsAnswer = COMMENT_ANSWERS.open;
-    },
-    passed: ({ app }) => app.requests.some((request) => request.path.startsWith('/comments?')),
-  },
-  {
-    // The app's own words as it sends comments: "Paste them into your agent, or ask it to read your review."
-    phrase: 'Read my review',
-    prepare: (app, project) => {
-      snapshot(project, MAP_PROJECT, 'Add the webshop');
-      app.commentsAnswer = COMMENT_ANSWERS.open;
-    },
-    passed: ({ app }) => app.requests.some((request) => request.path.startsWith('/comments?')),
-  },
+  { phrase: 'Address my ShadowGit review comments', ...READS_COMMENTS },
+  // The app's own words as it sends comments: "Paste them into your agent, or ask it to read your review."
+  { phrase: 'Read my review', ...READS_COMMENTS },
 ];
 
 /** The queries of the run's GET /docs requests. */

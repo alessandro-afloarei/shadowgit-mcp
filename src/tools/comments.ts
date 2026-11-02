@@ -1,9 +1,10 @@
 import type { CallToolResult, McpServer } from '@modelcontextprotocol/server';
 import * as z from 'zod/v4';
 import { clientName } from '../client-name.js';
-import { CommentReply, CommentsRead, type ReviewCommentRead, type ReviewSendRead } from '../comment-shapes.js';
+import { CommentReply, CommentsRead } from '../comment-shapes.js';
 import { resolveRepo } from '../repos.js';
 import { readComments, replyToComment } from '../session-api.js';
+import { snapshots } from './rules.js';
 import { andList, dataResult, forProject, list, plural, repoParam } from './shared.js';
 
 const CommentsOutput = z.object({
@@ -13,21 +14,25 @@ const CommentsOutput = z.object({
 });
 const ReplyOutput = z.object({ repo: z.string(), id: z.number().int(), reply: CommentReply });
 
+type Send = z.infer<typeof CommentsRead>['sends'][number];
+type Comment = Send['comments'][number];
+
 // The app's COMMENT_LIMITS.reply
 const REPLY_MAX = 1_000;
 
 const short = (hash: string) => hash.slice(0, 8);
 
 /** Where a comment is, as the app's clipboard text says it: the file alone, or its lines (removed ones said so) and the definition around them. */
-function placeOf({ anchor }: ReviewCommentRead): string {
+function placeOf({ anchor }: Comment): string {
   if (anchor.lines === null) return anchor.path;
   const { side, start, end } = anchor.lines;
-  const lines = start === end ? `${start}` : `${start}-${end}`;
-  return `${anchor.path}:${lines}${side === 'base' ? ' (removed lines)' : anchor.symbol === null ? '' : ` (${anchor.symbol})`}`;
+  const at = `${anchor.path}:${start === end ? start : `${start}-${end}`}`;
+  if (side === 'base') return `${at} (removed lines)`;
+  return anchor.symbol === null ? at : `${at} (${anchor.symbol})`;
 }
 
 /** A comment as the app's card reads it: its tag, place and snapshot, the lines quoted, its words, what changed since and the replies. */
-function commentLines(comment: ReviewCommentRead): string[] {
+function commentLines(comment: Comment): string[] {
   const tag = `${comment.tag.charAt(0).toUpperCase()}${comment.tag.slice(1)}`;
   return [
     `#${comment.id} [${tag}] ${placeOf(comment)} · at ${short(comment.anchor.snapshot)}`,
@@ -38,10 +43,8 @@ function commentLines(comment: ReviewCommentRead): string[] {
   ];
 }
 
-function sendLines(send: ReviewSendRead): string[] {
-  const range = send.range === null
-    ? 'with no range open'
-    : `reading ${send.range.label} (${send.range.base === null ? 'start' : short(send.range.base)}..${short(send.range.head)})`;
+function sendLines(send: Send): string[] {
+  const range = send.range === null ? 'with no range open' : `reading ${send.range.label} (${snapshots(send.range)})`;
   const unviewed = send.unviewed ?? [];
   return [
     `Send ${send.id}, ${range}:`,
@@ -95,7 +98,7 @@ export function registerComments(server: McpServer): void {
         'Reply to one review comment the person sent from ShadowGit, by its id from get_review_comments: what you changed for it, or your answer to its question, in a sentence or two. ShadowGit shows the reply under the comment with your name and a snapshot: during a session, the one its checkpoint or its end makes, which holds your change; outside a session, the newest one as you reply. A reply leaves the comment open: only the person resolves it. Needs the ShadowGit app running.',
       inputSchema: z.object({
         id: z.number().int().positive().describe("The comment's id, as get_review_comments gives it"),
-        text: z.string().trim().min(1).max(REPLY_MAX).describe('What you changed for it, or your answer: at most 1,000 characters'),
+        text: z.string().trim().min(1).max(REPLY_MAX).describe(`What you changed for it, or your answer: at most ${REPLY_MAX.toLocaleString('en-US')} characters`),
         repo: repoParam,
       }),
       outputSchema: ReplyOutput,

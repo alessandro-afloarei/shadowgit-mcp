@@ -1,4 +1,5 @@
 import * as z from 'zod/v4';
+import { Range } from './rule-shapes.js';
 
 /**
  * The person's review comments as GET /api/comments answers them (the app's CommentView and SendRecord), each without
@@ -30,13 +31,10 @@ const ReviewComment = z.object({
 const ReviewSend = z.object({
   id: z.number().int(),
   at: z.string(),
-  range: z.object({ label: z.string(), base: z.string().nullable(), head: z.string() }).nullable().describe('The range open in Changes at the Send; null when none was'),
+  range: Range.extend({ label: z.string() }).nullable().describe('The range open in Changes at the Send; null when none was'),
   unviewed: z.array(z.string()).nullable().describe('Files of that range the person had not viewed then, at most 20'),
   moreUnviewed: z.number().int(),
   comments: z.array(ReviewComment),
 });
 
 export const CommentsRead = z.object({ sends: z.array(ReviewSend) });
-
-export type ReviewCommentRead = z.infer<typeof ReviewComment>;
-export type ReviewSendRead = z.infer<typeof ReviewSend>;

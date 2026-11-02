@@ -10,25 +10,26 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { COMMENT_ANSWERS, MAP_PROJECT, startFakeApp } from '../tests/helpers/fake-app.js';
-import { makeProject, removeTempDirs } from '../tests/helpers/fixtures.js';
+import { makeProject, removeTempDirs, shadowGit } from '../tests/helpers/fixtures.js';
 import { EDITS, STREAM_ARGS, ago, readStream, runClaude } from './claude.js';
 
 const RUNS = Number(process.env.RUNS ?? 10);
 const PASS_AT = Math.ceil(0.8 * RUNS);
 const PROMPT = 'Address my ShadowGit review comments.';
-const COMMENTS = [1, 2, 3, 4];
+const COMMENTS = COMMENT_ANSWERS.open.sends.flatMap((send) => send.comments.map((comment) => comment.id));
 
+type Asked = { start: number; end: number; done: (span: string) => boolean };
 /** The definitions the change comments are on, by their lines in MAP_PROJECT, and whether a change does what the comment asks. */
-const ASKED: Record<string, { start: number; end: number; done: (span: string) => boolean }> = {
-  'src/api/cart.ts': { start: 10, end: 12, done: (span) => /\b100\b/.test(span) },
+const CART: Asked = { start: 10, end: 12, done: (span) => /\b100\b/.test(span) };
+const ASKED: Record<string, Asked> = {
+  'src/api/cart.ts': CART,
   'src/api/orders.ts': { start: 15, end: 17, done: (span) => !span.includes('createOrder(i))') },
 };
 
-/** The project's files, by their path in it, without the histories and Claude Code's own folder. */
-function filesOf(project: string): Map<string, string> {
-  const skip = /^(\.git|\.shadowgit\.git|\.claude)(\/|$)/;
-  const files = fs.readdirSync(project, { recursive: true, encoding: 'utf8' }).map((file) => file.split(path.sep).join('/')).filter((file) => !skip.test(file));
-  return new Map(files.filter((file) => fs.statSync(path.join(project, file)).isFile()).map((file) => [file, fs.readFileSync(path.join(project, file), 'utf8')]));
+/** The files the run changed, added or removed, as the project's history sees them, without Claude Code's own folder. */
+function changedFiles(project: string): string[] {
+  shadowGit(project, ['add', '-A']);
+  return shadowGit(project, ['diff', '--cached', '--name-only']).split('\n').filter((file) => file !== '' && !file.startsWith('.claude/'));
 }
 
 /** The lines of `file` that stand where lines start to end stood, when every line outside them is as it was; null otherwise. */
@@ -49,36 +50,35 @@ function selfCheck(): void {
   const lines = cart.split('\n');
   const inside = [...lines.slice(0, 10), '  return total >= 100 ? 0 : 5;', ...lines.slice(11)].join('\n');
   const checks = [
-    spanOf('src/api/cart.ts', cart, ASKED['src/api/cart.ts'] ?? { start: 0, end: 0 }) !== null,
-    spanOf('src/api/cart.ts', `// moved\n${cart}`, { start: 10, end: 12 }) === null,
-    ASKED['src/api/cart.ts']?.done(spanOf('src/api/cart.ts', inside, { start: 10, end: 12 }) ?? '') === true,
+    spanOf('src/api/cart.ts', cart, CART) !== null,
+    spanOf('src/api/cart.ts', `// moved\n${cart}`, CART) === null,
+    CART.done(spanOf('src/api/cart.ts', inside, CART) ?? ''),
   ];
   if (!checks.every(Boolean)) throw new Error(`self-check: ${JSON.stringify(checks)}`);
   console.log('self-check: the definition read untouched, refused after an edit above it, and the change found inside it');
 }
 
-type Run = { passed: boolean };
-
-async function run(label: string): Promise<Run | null> {
+/** One run: whether it passed, or null when it errored. */
+async function run(label: string): Promise<boolean | null> {
   const app = await startFakeApp();
   try {
     const project = makeProject('webshop', MAP_PROJECT, ago(60));
     app.commentsAnswer = COMMENT_ANSWERS.open;
     const { calls, reply, cost } = readStream(await runClaude({ prompt: PROMPT, project, app, timeoutMs: 420_000, args: STREAM_ARGS }));
 
-    const read = calls.findIndex((call) => call.name === 'mcp__shadowgit__get_review_comments');
+    const readAt = calls.findIndex((call) => call.name === 'mcp__shadowgit__get_review_comments');
     const edited = calls.findIndex((call) => EDITS.has(call.name));
     const replies = app.requestsTo('/comments/reply');
     const replied = new Set(replies.map((body) => Number(body.id)));
-    const files = filesOf(project);
-    const changed = [...new Set([...files.keys(), ...Object.keys(MAP_PROJECT)])].filter((file) => files.get(file) !== MAP_PROJECT[file]);
+    const changed = changedFiles(project);
+    const read = (file: string) => (fs.existsSync(path.join(project, file)) ? fs.readFileSync(path.join(project, file), 'utf8') : '');
 
     const failures = [
-      ...(read === -1 ? ['never read the comments'] : edited !== -1 && edited < read ? ['edited before reading the comments'] : []),
+      ...(readAt === -1 ? ['never read the comments'] : edited !== -1 && edited < readAt ? ['edited before reading the comments'] : []),
       ...COMMENTS.filter((id) => !replied.has(id)).map((id) => `no reply to #${id}`),
       ...changed.filter((file) => ASKED[file] === undefined).map((file) => `changed ${file}`),
       ...Object.entries(ASKED).flatMap(([file, asked]) => {
-        const span = spanOf(file, files.get(file) ?? '', asked);
+        const span = spanOf(file, read(file), asked);
         if (span === null) return [`changed ${file} outside lines ${asked.start}-${asked.end}`];
         return asked.done(span) ? [] : [`${file}: not the change asked`];
       }),
@@ -88,7 +88,7 @@ async function run(label: string): Promise<Run | null> {
     console.log(`  tools: ${calls.map((call) => call.name.replace('mcp__shadowgit__', 'shadowgit:')).join(' → ') || 'none'}`);
     for (const body of replies) console.log(`  reply #${String(body.id)}: ${String(body.text).replace(/\s+/g, ' ').slice(0, 160)}`);
     console.log(`  says: ${reply.replace(/\s+/g, ' ').slice(0, 300)}`);
-    return { passed };
+    return passed;
   } catch (error) {
     console.log(`${label}: error ${error instanceof Error ? error.message.slice(0, 300) : String(error)}`);
     return null;
@@ -99,9 +99,9 @@ async function run(label: string): Promise<Run | null> {
 }
 
 selfCheck();
-const runs: (Run | null)[] = [];
+const runs: (boolean | null)[] = [];
 for (let i = 1; i <= RUNS; i++) runs.push(await run(`run ${i}`));
-const passed = runs.filter((result) => result?.passed).length;
+const passed = runs.filter((result) => result === true).length;
 const errors = runs.filter((result) => result === null).length;
 console.log(`\n${passed} of ${RUNS} runs addressed the comments as asked (pass at ${PASS_AT})`);
 if (errors > 0) console.log(`${errors} runs errored, counted as neither`);

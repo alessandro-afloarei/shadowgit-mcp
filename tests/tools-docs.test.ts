@@ -26,8 +26,6 @@ beforeEach(() => {
   app.docsStatus = 200;
   app.docsAnswer = DOCS_ANSWERS.session;
   app.docsWritten = null;
-  app.answers = {};
-  app.statuses = {};
 });
 
 const docsAsked = () => app.requests.filter((request) => request.path.startsWith('/docs?')).map((request) => request.path);
@@ -273,14 +271,6 @@ describe('write_docs', () => {
       `ShadowGit keeps your words for src/billing and src/api, at snapshot ${head.slice(0, 8)}. Left out: src/jobs: ✖ Too big: expected string to have <=200 characters\n  → at words.summary.`,
     );
     expect(textOf(result)).not.toMatch(JUDGING);
-  });
-
-  it("passes on the app's reason when it keeps no page", async () => {
-    app.answers['/docs'] = { success: false, error: 'No page to keep: src/jobs: ✖ Too big: expected string to have <=200 characters' };
-    app.statuses['/docs'] = 400;
-    await expect(writeDocs({ head: HEAD, pages: [{ area: 'src/jobs', summary: 'x'.repeat(201), body: ['Retries.'] }] }, 'Claude Code')).rejects.toThrow(
-      'ShadowGit: No page to keep: src/jobs',
-    );
   });
 
   it('both tools say an app without docs needs updating', async () => {

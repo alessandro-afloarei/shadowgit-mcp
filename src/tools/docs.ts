@@ -117,17 +117,9 @@ function writeStep({ head, limits, pages, next: more }: Read): string | undefine
   return `Write the words of ${andList(asked.map(({ page }) => pageName(page)))} with write_docs, head ${JSON.stringify(head)}: ${words}.${following}`;
 }
 
-/** What an answer with no page asked for: the latest session's pages, a range's, or all of them. The app answers every page named. */
-type Ask = 'session' | 'range' | 'all';
-
-const NONE: Record<Ask, (repo: string) => string> = {
-  session: (repo) => `The latest AI session in ${repo} changed no area whose docs page needs words.`,
-  range: (repo) => `The range changed no area of ${repo} whose docs page needs words.`,
-  all: (repo) => `Every page of ${repo}'s map has words.`,
-};
-
-function describeDocs(repo: string, read: Read, ask: Ask, step: string | undefined): string {
-  if (read.pages.length === 0) return NONE[ask](repo);
+/** `none` says what an answer without pages means for what was asked; the app answers every page named. */
+function describeDocs(repo: string, read: Read, none: string, step: string | undefined): string {
+  if (read.pages.length === 0) return none;
   return [
     `${repo}'s docs pages, at snapshot ${read.head.slice(0, 8)}; the map is ${drawnFrom(read.mapAsOf)}`,
     ...read.pages.flatMap((page) => ['', ...pageLines(page)]),
@@ -157,8 +149,8 @@ export async function getDocs({
   const named = areas.length > 0 || overview;
   if (batch && named) throw new Error(BOTH);
   // A base of null is a range from the start of the history: only a base left out is half a range
-  const ranged = base !== undefined || head !== undefined;
-  if (ranged && (base === undefined || head === undefined)) throw new Error(HALF_RANGE);
+  if ((base === undefined) !== (head === undefined)) throw new Error(HALF_RANGE);
+  const ranged = head !== undefined;
   if (ranged && (batch || named)) throw new Error(ONE_ASK);
   const project = resolveRepo(repo);
   const read = await readDocs({ repoPath: project.path, base, head, areas, overview, all: batch, next: more });
@@ -166,8 +158,12 @@ export async function getDocs({
   const written = writeStep(read);
   const step = written === undefined ? undefined : `${forProject(repo, project)}${written}`;
   const { next: cursor, ...rest } = read;
-  const ask: Ask = ranged ? 'range' : batch ? 'all' : 'session';
-  return dataResult(DocsOutput, describeDocs(project.name, read, ask, step), { repo: project.name, ...rest, more: cursor, ...(step !== undefined && { next: step }) });
+  const none = ranged
+    ? `The range changed no area of ${project.name} whose docs page needs words.`
+    : batch
+      ? `Every page of ${project.name}'s map has words.`
+      : `The latest AI session in ${project.name} changed no area whose docs page needs words.`;
+  return dataResult(DocsOutput, describeDocs(project.name, read, none, step), { repo: project.name, ...rest, more: cursor, ...(step !== undefined && { next: step }) });
 }
 
 // code-graph's DOC_LIMITS, which get_docs answers as limits

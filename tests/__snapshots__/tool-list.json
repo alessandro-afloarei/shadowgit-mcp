@@ -4674,9 +4674,9 @@
                       }
                     },
                     "required": [
-                      "label",
                       "base",
-                      "head"
+                      "head",
+                      "label"
                     ],
                     "type": "object"
                   },

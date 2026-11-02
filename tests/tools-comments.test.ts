@@ -1,4 +1,5 @@
 import { describe, it, expect, beforeAll, afterAll, beforeEach } from 'vitest';
+import { CommentsRead } from '../src/comment-shapes.js';
 import { APP_WITHOUT_COMMENTS } from '../src/session-api.js';
 import { getReviewComments, replyToReviewComment } from '../src/tools/comments.js';
 import { COMMENT_ANSWERS, startFakeApp, type CommentsWire, type FakeApp } from './helpers/fake-app.js';
@@ -29,10 +30,6 @@ beforeEach(() => {
   app.answers = {};
 });
 
-const sends = (answer: CommentsWire) => answer.sends.map(({ id, at, range, unviewed, moreUnviewed, comments }) => ({
-  id, at, range, unviewed, moreUnviewed, comments: comments.map(({ id: comment, tag, body, anchor, since, replies }) => ({ id: comment, tag, body, anchor, since, replies })),
-}));
-
 /** A comment of an answer, varied: its anchor's lines, or its side. */
 const varied = (answer: CommentsWire, id: number, anchor: (lines: { side: string; start: number; end: number }) => object) => ({
   sends: answer.sends.map((send) => ({
@@ -53,7 +50,7 @@ describe('get_review_comments', () => {
     expect(app.requests.map((request) => request.path)).toEqual([`/comments?${new URLSearchParams({ repoPath: project })}`]);
     expect(result.structuredContent).toEqual({
       repo: 'webshop',
-      sends: sends(COMMENT_ANSWERS.open),
+      sends: CommentsRead.parse(COMMENT_ANSWERS.open).sends,
       next: 'Change only what each comment asks, then reply to each with reply_to_review_comment: #1, #2, #3 and #4.',
     });
     const text = textOf(result);
