@@ -1,5 +1,6 @@
 import type { CallToolResult, McpServer } from '@modelcontextprotocol/server';
 import * as z from 'zod/v4';
+import { asClient } from '../client-name.js';
 import { readRepos, repoArgument, resolveRepo } from '../repos.js';
 import { activeSessions, endSession as endAppSession } from '../session-api.js';
 import { dataResult, forRepo, repoParam } from './shared.js';
@@ -62,6 +63,6 @@ export function registerEndSession(server: McpServer): void {
       outputSchema: Output,
       annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
     },
-    endSession,
+    asClient(server, endSession),
   );
 }

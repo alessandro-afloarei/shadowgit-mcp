@@ -1,6 +1,6 @@
 import type { CallToolResult, McpServer } from '@modelcontextprotocol/server';
 import * as z from 'zod/v4';
-import { clientName } from '../client-name.js';
+import { asClient } from '../client-name.js';
 import { resolveRepo } from '../repos.js';
 import { CheckpointRules } from '../rule-shapes.js';
 import { createCheckpoint } from '../session-api.js';
@@ -42,6 +42,6 @@ export function registerCheckpoint(server: McpServer): void {
       outputSchema: Output,
       annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
     },
-    (args, ctx) => checkpoint(args, clientName(server, ctx)),
+    asClient(server, checkpoint),
   );
 }

@@ -62,7 +62,8 @@ describe('start_session', () => {
     const result = await startSession({ description: 'Fix login' }, 'Claude Code');
     expect(result.structuredContent).toEqual({ session_id: expect.stringMatching(/^claude-code-\d+$/), repo: 'webshop', already_active: false });
     expect(app.requests.at(-1)).toEqual({
-      path: '/session/start', body: { repoPath: project, description: 'Fix login', aiTool: 'Claude Code' },
+      // Called directly, outside a tool call: no client to name
+      path: '/session/start', body: { repoPath: project, description: 'Fix login', aiTool: 'Claude Code' }, client: null,
     });
   });
 
@@ -116,6 +117,7 @@ describe('checkpoint', () => {
     expect(app.requests.at(-1)).toEqual({
       path: '/checkpoint',
       body: { repoPath: project, title: 'Fix login redirect', message: 'Loop on expired tokens.', author: 'Claude Code' },
+      client: null,
     });
   });
 
@@ -147,7 +149,7 @@ describe('end_session', () => {
     expect(textOf(result)).toContain('Next: If its edits are in a checkpoint: get_lens, then write_lens_words');
     // The Lens reads snapshots: edits ended without a checkpoint are not in one yet
     expect(textOf(result)).toContain('if not, checkpoint them first');
-    expect(app.requests.at(-1)).toEqual({ path: '/session/end', body: { sessionId: 'claude-code-7' } });
+    expect(app.requests.at(-1)).toEqual({ path: '/session/end', body: { sessionId: 'claude-code-7' }, client: null });
   });
 
   it('goes straight to the Lens when the app takes the unsaved edits into a snapshot as the session ends', async () => {

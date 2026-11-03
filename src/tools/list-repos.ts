@@ -2,6 +2,7 @@ import type { CallToolResult, McpServer } from '@modelcontextprotocol/server';
 import fs from 'node:fs';
 import path from 'node:path';
 import * as z from 'zod/v4';
+import { asClientWithoutInput } from '../client-name.js';
 import { SHADOWGIT_DIR, runGit } from '../git.js';
 import { currentRepo, hasCode, readRepos, tildify, type Repo } from '../repos.js';
 import { AppNotRunningError, AppTimeoutError, activeSessions, type ActiveSession } from '../session-api.js';
@@ -56,7 +57,7 @@ export function registerListRepos(server: McpServer): void {
       outputSchema: Output,
       annotations: { readOnlyHint: true, destructiveHint: false, openWorldHint: false },
     },
-    listRepos,
+    asClientWithoutInput(server, listRepos),
   );
 }
 

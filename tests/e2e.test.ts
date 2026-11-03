@@ -214,6 +214,12 @@ describe.each(ERAS)('protocol $era', ({ era, mode }) => {
     expect(app.requestsTo('/docs')[0]).toEqual({ author: 'shadowgit-e2e', repoPath: project, head: FAKE_RANGE.head, pages: [{ overview: true, holds: true }] });
   });
 
+  // The app says which assistant is connected from this header: every request a tool makes carries it
+  it('names its client on every request it makes', () => {
+    expect(app.requests.length).toBeGreaterThan(0);
+    expect(app.requests.filter((request) => request.client !== 'shadowgit-e2e').map((request) => request.path)).toEqual([]);
+  });
+
   it('sends linked pieces, a why and an excerpt as given', async () => {
     const step = {
       id: 'c1',

@@ -1,6 +1,6 @@
 import type { CallToolResult, McpServer } from '@modelcontextprotocol/server';
 import * as z from 'zod/v4';
-import { clientName } from '../client-name.js';
+import { asClient } from '../client-name.js';
 import { resolveRepo } from '../repos.js';
 import { activeSessions, startSession as startAppSession } from '../session-api.js';
 import { dataResult, forProject, plural, repoParam } from './shared.js';
@@ -50,6 +50,6 @@ export function registerStartSession(server: McpServer): void {
       outputSchema: Output,
       annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
     },
-    (args, ctx) => startSession(args, clientName(server, ctx)),
+    asClient(server, startSession),
   );
 }

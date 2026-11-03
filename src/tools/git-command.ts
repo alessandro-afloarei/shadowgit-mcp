@@ -1,5 +1,6 @@
 import type { CallToolResult, McpServer } from '@modelcontextprotocol/server';
 import * as z from 'zod/v4';
+import { asClient } from '../client-name.js';
 import { capOutput, refusal, runGit, tokenize } from '../git.js';
 import { resolveRepo } from '../repos.js';
 import { repoParam } from './shared.js';
@@ -41,6 +42,6 @@ export function registerGitCommand(server: McpServer): void {
       }),
       annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
     },
-    gitCommand,
+    asClient(server, gitCommand),
   );
 }

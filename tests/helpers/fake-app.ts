@@ -20,8 +20,8 @@ export function fakeSession(overrides: Partial<FakeSession> = {}): FakeSession {
 
 export interface FakeApp {
   url: string;
-  /** Every request, with its path relative to /api. */
-  requests: { path: string; body: Record<string, unknown> }[];
+  /** Every request, with its path relative to /api, and the client the server named in its header (null without one). */
+  requests: { path: string; body: Record<string, unknown>; client: string | null }[];
   /** The bodies of the requests to one route, in order. */
   requestsTo(route: string): Record<string, unknown>[];
   sessions: FakeSession[];
@@ -249,7 +249,8 @@ async function listen(): Promise<FakeApp> {
     for await (const chunk of req) text += chunk;
     const body: Record<string, unknown> = text ? JSON.parse(text) : {};
     const route = (req.url ?? '').replace(/^\/api/, '');
-    app.requests.push({ path: route, body });
+    const client = req.headers['x-shadowgit-client'];
+    app.requests.push({ path: route, body, client: typeof client === 'string' ? client : null });
     if (app.hang) return;
     if (app.hangBody) {
       res.writeHead(200, { 'content-type': 'application/json' });

@@ -1,6 +1,6 @@
 import type { CallToolResult, McpServer } from '@modelcontextprotocol/server';
 import * as z from 'zod/v4';
-import { clientName } from '../client-name.js';
+import { asClient } from '../client-name.js';
 import { CommentReply, CommentsRead } from '../comment-shapes.js';
 import { resolveRepo } from '../repos.js';
 import { readComments, replyToComment } from '../session-api.js';
@@ -88,7 +88,7 @@ export function registerComments(server: McpServer): void {
       outputSchema: CommentsOutput,
       annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
     },
-    getReviewComments,
+    asClient(server, getReviewComments),
   );
   server.registerTool(
     'reply_to_review_comment',
@@ -104,6 +104,6 @@ export function registerComments(server: McpServer): void {
       outputSchema: ReplyOutput,
       annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
     },
-    (args, ctx) => replyToReviewComment(args, clientName(server, ctx)),
+    asClient(server, replyToReviewComment),
   );
 }

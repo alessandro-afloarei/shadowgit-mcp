@@ -1,6 +1,6 @@
 import type { CallToolResult, McpServer } from '@modelcontextprotocol/server';
 import * as z from 'zod/v4';
-import { clientName } from '../client-name.js';
+import { asClient } from '../client-name.js';
 import { resolveRepo, type Repo } from '../repos.js';
 import { LensLines, LensRead, readDocs, readLens, sendLensWords, WordsWritten, type LensWords } from '../session-api.js';
 import { pageName } from './docs.js';
@@ -131,7 +131,7 @@ export function registerLens(server: McpServer): void {
       outputSchema: LensOutput,
       annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
     },
-    getLens,
+    asClient(server, getLens),
   );
   server.registerTool(
     'write_lens_words',
@@ -171,6 +171,6 @@ export function registerLens(server: McpServer): void {
       // Destructive: words written for an id replace the ones it had
       annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: true, openWorldHint: false },
     },
-    (args, ctx) => writeLensWords(args, clientName(server, ctx)),
+    asClient(server, writeLensWords),
   );
 }
