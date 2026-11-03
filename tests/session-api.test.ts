@@ -49,6 +49,13 @@ describe('sessions', () => {
     expect(await activeSessions()).toEqual([]);
   });
 
+  // fetch refuses a header with a character above U+00FF: a client called "Cursor ✨" must still reach the app
+  it('names a client whose name has any character, percent-encoded', async () => {
+    const { callingClient } = await import('../src/client-name.js');
+    await callingClient.run('Cursor ✨', () => activeSessions());
+    expect(app.requests.at(-1)?.client).toBe('Cursor%20%E2%9C%A8');
+  });
+
   it('reports an app that does not answer as AppNotRunningError, naming the endpoint it asked', async () => {
     const closed = await closedAppUrl();
     vi.stubEnv('SHADOWGIT_SESSION_API', closed);

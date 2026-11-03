@@ -129,10 +129,13 @@ function endpoint(): string {
   return (URL.canParse(url) && new URL(url).host) || 'the address in SHADOWGIT_SESSION_API';
 }
 
-/** The header naming the client of the tool call running, which the app shows as connected; none outside a call. */
+/**
+ * The header naming the client of the tool call running, which the app shows as connected; none outside a call.
+ * Percent-encoded: fetch refuses a header with a character above U+00FF, as a name or title may have.
+ */
 function clientHeader(): Record<string, string> {
   const client = callingClient.getStore();
-  return client === undefined ? {} : { 'x-shadowgit-client': client };
+  return client === undefined ? {} : { 'x-shadowgit-client': encodeURIComponent(client) };
 }
 
 /**

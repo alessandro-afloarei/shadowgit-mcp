@@ -5,7 +5,7 @@ All notable changes to the ShadowGit MCP Server will be documented in this file.
 ## [2.8.0] - 2026-11-03
 
 ### Added
-- Every request the server sends the ShadowGit app names its client (`x-shadowgit-client`), so the app can say which
+- Every request the server sends the ShadowGit app names its client (`x-shadowgit-client`, percent-encoded), so the app can say which
   assistant is connected. Claude Code, Cursor and Claude Desktop are named as people know them, not by the ids their
   clients send (`claude-code`, `cursor-vscode`, `claude-ai`); a client's own title still wins.
 
