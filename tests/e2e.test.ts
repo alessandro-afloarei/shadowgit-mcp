@@ -2,7 +2,7 @@ import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import type { Client } from '@modelcontextprotocol/client';
 import { INSTRUCTIONS } from '../src/server.js';
 import { ERAS, connect } from './helpers/client.js';
-import { FAKE_RANGE, fakeSession, startFakeApp, type FakeApp } from './helpers/fake-app.js';
+import { COMMENT_ANSWERS, FAKE_RANGE, fakeSession, startFakeApp, type FakeApp } from './helpers/fake-app.js';
 import { JUDGING, makeProject, removeTempDirs, restoreEnv, useStorage } from './helpers/fixtures.js';
 
 // The two protocol revisions put "$schema" in different places; key order is not content.
@@ -105,6 +105,41 @@ describe.each(ERAS)('protocol $era', ({ era, mode }) => {
     expect(seen('get_map')).toContain("behind: the changes to the area since its words, null until counted (mapAsOf's behind counts snapshots)");
   });
 
+  // The person's comments are read when they ask, changed as each asks, answered one by one, and resolved by them
+  // alone. The instructions have no room for a line of their own: the tools' names and descriptions carry it
+  it("describes the review comment tools, with what to change and who resolves, as facts", async () => {
+    const { tools } = await client.listTools();
+    const seen = (name: string) => {
+      const tool = tools.find((each) => each.name === name);
+      return `${tool?.description} ${JSON.stringify(tool?.inputSchema)}`;
+    };
+    for (const name of ['get_review_comments', 'reply_to_review_comment']) expect(seen(name), name).not.toMatch(JUDGING);
+    expect(seen('get_review_comments')).toContain('Change only what each comment asks, at its lines');
+    expect(seen('get_review_comments')).toContain('Ask the person before you change anything else.');
+    expect(seen('get_review_comments')).toContain('Only the person resolves a comment');
+    expect(seen('reply_to_review_comment')).toContain('only the person resolves it');
+    // A comment on removed lines numbers them in the snapshot it was written on, which the file no longer holds
+    expect(seen('get_review_comments')).toContain('side base: lines it removed, which the file no longer has');
+    // Outside a session the app takes the newest snapshot as the reply comes, which may not hold the change yet
+    expect(seen('reply_to_review_comment')).toContain('outside a session, the newest one as you reply');
+    expect(seen('reply_to_review_comment')).not.toContain('the snapshot that holds your change');
+  });
+
+  it('reads the review comments and replies, refusing a blank reply or one past 1,000 characters before asking the app', async () => {
+    app.commentsAnswer = COMMENT_ANSWERS.open;
+    const read = await client.callTool({ name: 'get_review_comments', arguments: {} });
+    expect(read.structuredContent).toMatchObject({ repo: 'demo', sends: [{ id: 1 }, { id: 2 }] });
+    for (const text of ['   ', 'x'.repeat(1_001)]) {
+      const refused = await client.callTool({ name: 'reply_to_review_comment', arguments: { id: 1, text } });
+      expect(refused.isError).toBe(true);
+    }
+    expect(app.requestsTo('/comments/reply')).toEqual([]);
+    const replied = await client.callTool({ name: 'reply_to_review_comment', arguments: { id: 1, text: '  Raised the threshold to 100.  ' } });
+    expect(replied.structuredContent).toMatchObject({ repo: 'demo', id: 1, reply: { by: 'shadowgit-e2e', text: 'Raised the threshold to 100.' } });
+    expect(app.requestsTo('/comments/reply')).toEqual([{ repoPath: project, id: 1, text: 'Raised the threshold to 100.', author: 'shadowgit-e2e' }]);
+    app.commentsAnswer = { sends: [] };
+  });
+
   it('describes every tool as facts', async () => {
     const { tools } = await client.listTools();
     for (const tool of tools) expect(tool.description, tool.name).not.toMatch(JUDGING);
@@ -131,10 +166,11 @@ describe.each(ERAS)('protocol $era', ({ era, mode }) => {
     expect(JSON.stringify(tools.map((tool) => tool.outputSchema))).not.toContain('prefixItems');
   });
 
-  it('lists the eleven tools exactly as pinned', async () => {
+  it('lists the thirteen tools exactly as pinned', async () => {
     const { tools } = await client.listTools();
     expect(tools.map((t) => t.name)).toEqual([
       'list_repos', 'git_command', 'get_map', 'get_code_context', 'start_session', 'checkpoint', 'end_session', 'get_lens', 'write_lens_words', 'get_docs', 'write_docs',
+      'get_review_comments', 'reply_to_review_comment',
     ]);
     await expect(JSON.stringify(tools, sortKeys, 2)).toMatchFileSnapshot('__snapshots__/tool-list.json');
   });

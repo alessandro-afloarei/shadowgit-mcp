@@ -4,7 +4,7 @@ import { clientName } from '../src/client-name.js';
 import { checkpoint } from '../src/tools/checkpoint.js';
 import { endSession } from '../src/tools/end-session.js';
 import { startSession } from '../src/tools/start-session.js';
-import { closedAppUrl, fakeSession, startFakeApp, type FakeApp } from './helpers/fake-app.js';
+import { COMMENT_ANSWERS, closedAppUrl, fakeSession, startFakeApp, type FakeApp } from './helpers/fake-app.js';
 import { makeProject, removeTempDirs, restoreEnv, tempDir, textOf, useStorage } from './helpers/fixtures.js';
 
 let project: string;
@@ -30,6 +30,7 @@ beforeEach(() => {
   app.sessions.length = 0;
   app.checkpointStatus = 200;
   app.endCommit = null;
+  app.commentsAnswer = { sends: [] };
 });
 
 afterEach(() => {
@@ -75,6 +76,34 @@ describe('start_session', () => {
   it('says the app is not running when nothing answers', async () => {
     vi.stubEnv('SHADOWGIT_SESSION_API', await closedAppUrl());
     await expect(startSession({ description: 'Fix login' }, 'Claude Code')).rejects.toThrow("ShadowGit isn't running");
+  });
+
+  it('names the open review comments as a session starts, without asking to act on them', async () => {
+    const four = 'The person sent 4 review comments on this project. Read them with get_review_comments when they ask you to address their review.';
+    app.commentsAnswer = COMMENT_ANSWERS.open;
+    const started = await startSession({ description: 'Fix login' }, 'Claude Code');
+    expect(started.structuredContent).toMatchObject({ repo: 'webshop', already_active: false, review: four });
+    expect(textOf(started)).toMatch(new RegExp(`^Started session .+\\. ${four.replace(/[.]/g, '\\.')}$`));
+
+    app.sessions.length = 0;
+    const [send] = COMMENT_ANSWERS.open.sends;
+    app.commentsAnswer = { sends: send === undefined ? [] : [{ ...send, comments: send.comments.slice(0, 1) }] };
+    expect((await startSession({ description: 'Fix login' }, 'Claude Code')).structuredContent).toMatchObject({
+      review: 'The person sent 1 review comment on this project. Read it with get_review_comments when they ask you to address their review.',
+    });
+
+    app.sessions.length = 0;
+    app.commentsAnswer = { sends: [] };
+    expect((await startSession({ description: 'Fix login' }, 'Claude Code')).structuredContent).not.toHaveProperty('review');
+  });
+
+  it('names another project in its review sentence, so get_review_comments reads that one', async () => {
+    app.commentsAnswer = COMMENT_ANSWERS.open;
+    const started = await startSession({ description: 'Fix login', repo: 'blog' }, 'Claude Code');
+    expect(started.structuredContent).toMatchObject({
+      repo: 'blog',
+      review: 'For blog, pass repo "blog" to each tool. The person sent 4 review comments on this project. Read them with get_review_comments when they ask you to address their review.',
+    });
   });
 });
 

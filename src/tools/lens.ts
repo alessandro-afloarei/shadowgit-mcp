@@ -8,7 +8,7 @@ import { passing, quote, rangeLines, snapshots } from './rules.js';
 import { andList, dataResult, forProject, plural, repoParam, Snapshot } from './shared.js';
 
 const LensOutput = z.object({ repo: z.string(), ...LensRead.shape });
-const WordsOutput = z.object({ repo: z.string(), ...WordsWritten.shape, next: z.string().optional().describe('The step that follows: the docs pages the session changed') });
+const WordsOutput = z.object({ repo: z.string(), ...WordsWritten.shape, next: z.string().optional().describe('The step that follows: the docs pages the range changed') });
 // The docs step is worth a short wait, never a long one: past it the words' answer goes on without it
 const DOCS_PROBE_MS = 20_000;
 
@@ -88,35 +88,17 @@ export async function getLens({ base, head, repo }: { base?: string | null; head
   return dataResult(LensOutput, describeLens(project.name, read.lens, read), data);
 }
 
-/** Whether a range the agent names, by full or short hashes, is `range`. */
-const isRange = (range: Read['range'], base: string | null, head: string) =>
-  range.head.startsWith(head) && (base === null ? range.base === null : range.base?.startsWith(base) === true);
-
 /**
- * The docs pages the latest AI session changed whose words are missing or behind, when the words are for its range:
- * the app reads the latest session's pages, which another range's change doesn't touch. The range is read first, so
- * another range's words never set the app counting.
- */
-async function sessionPages(project: Repo, base: string | null, head: string) {
-  // One wait for both reads; get_lens drew the session's lens just now, so the first is read from the app's cache
-  const deadline = Date.now() + DOCS_PROBE_MS;
-  const session = await readLens({ repoPath: project.path, timeoutMs: DOCS_PROBE_MS });
-  const left = deadline - Date.now();
-  if (!isRange(session.range, base, head) || left <= 0) return [];
-  return (await readDocs({ repoPath: project.path, timeoutMs: left })).pages;
-}
-
-/**
- * The step after the Lens's words: the docs pages the session changed that need words. None when the words are for
- * another range, the app has no docs, counts past the wait, has no page to update, or answers in a shape this version
- * doesn't read: the words are kept either way, and get_docs still says why when the agent asks.
+ * The step after the Lens's words: the docs pages the range they are for changed that need words. None when the app has
+ * no docs, counts past the wait, has no page to update, or answers in a shape this version doesn't read: the words are
+ * kept either way, and get_docs still says why when the agent asks.
  */
 async function docsStep(project: Repo, repo: string | undefined, base: string | null, head: string): Promise<string | undefined> {
-  const pages = await sessionPages(project, base, head).catch(() => []);
+  const pages = await readDocs({ repoPath: project.path, base, head, timeoutMs: DOCS_PROBE_MS }).then((read) => read.pages, () => []);
   if (pages.length === 0) return undefined;
   const names = andList(pages.map(({ page }) => pageName(page)));
   const of = pages.some(({ page }) => 'overview' in page) ? 'of the areas it changed and of the whole project' : 'of the areas it changed';
-  return `${forProject(repo, project)}The session's last step: the docs pages ${of}, ${names}, need words, so the pages the user reads in ShadowGit describe the code as it is now. A page with no words can start short, from its facts and the code you read. get_docs, then write_docs.`;
+  return `${forProject(repo, project)}The session's last step: the docs pages ${of}, ${names}, need words, so the pages the user reads in ShadowGit describe the code as it is now. A page with no words can start short, from its facts and the code you read. get_docs with base ${JSON.stringify(base)} and head ${JSON.stringify(head)}, then write_docs.`;
 }
 
 export async function writeLensWords(

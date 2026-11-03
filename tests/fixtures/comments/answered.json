@@ -1,0 +1,168 @@
+{
+  "success": true,
+  "sends": [
+    {
+      "version": 1,
+      "id": 1,
+      "at": "2026-11-02T21:55:55.325Z",
+      "range": {
+        "label": "This AI session",
+        "base": "4e94d8973b50eeb59082dcf55779b8eae8a070bb",
+        "head": "e9c0de750a40c94ccfd65d254ae2dc9a3e129e11"
+      },
+      "comments": [
+        {
+          "version": 1,
+          "id": 3,
+          "tag": "change",
+          "body": "Number the orders from 1: createOrder(0) gives order id 0.",
+          "status": "sent",
+          "anchor": {
+            "snapshot": "e9c0de750a40c94ccfd65d254ae2dc9a3e129e11",
+            "path": "src/api/orders.ts",
+            "lines": {
+              "side": "head",
+              "start": 16,
+              "end": 16
+            },
+            "quote": [
+              "  return Array.from({ length: count }, (_, i) => createOrder(i));"
+            ],
+            "symbol": "listOrders"
+          },
+          "created": "2026-11-02T21:55:55.246Z",
+          "updated": "2026-11-02T21:55:55.326Z",
+          "send": 1,
+          "replies": [],
+          "since": {
+            "snapshot": "fcd07176edb02da1a6b6dd767eb9e427a18a13b0"
+          }
+        },
+        {
+          "version": 1,
+          "id": 2,
+          "tag": "question",
+          "body": "Why divide by 100 and round again, when the amount is already in cents?",
+          "status": "sent",
+          "anchor": {
+            "snapshot": "e9c0de750a40c94ccfd65d254ae2dc9a3e129e11",
+            "path": "src/billing/discount.ts",
+            "lines": {
+              "side": "head",
+              "start": 4,
+              "end": 4
+            },
+            "quote": [
+              "  return code === 'SAVE10' ? roundCents((cents / 100) * 0.9) : cents;"
+            ],
+            "symbol": "applyDiscount"
+          },
+          "created": "2026-11-02T21:55:55.210Z",
+          "updated": "2026-11-02T21:55:55.326Z",
+          "send": 1,
+          "replies": [
+            {
+              "by": "Claude Code",
+              "text": "It rounds a fractional discount to whole cents.",
+              "at": "2026-11-02T21:55:56.761Z",
+              "snapshot": "ea91253cee9087fead98d21f7628096cd8d1e49a"
+            }
+          ],
+          "since": null
+        },
+        {
+          "version": 1,
+          "id": 1,
+          "tag": "change",
+          "body": "Free shipping starts at 100, not 50.",
+          "status": "sent",
+          "anchor": {
+            "snapshot": "e9c0de750a40c94ccfd65d254ae2dc9a3e129e11",
+            "path": "src/api/cart.ts",
+            "lines": {
+              "side": "head",
+              "start": 11,
+              "end": 11
+            },
+            "quote": [
+              "  return total > 50 ? 0 : 5;"
+            ],
+            "symbol": "shipping"
+          },
+          "created": "2026-11-02T21:55:55.178Z",
+          "updated": "2026-11-02T21:55:55.326Z",
+          "send": 1,
+          "replies": [
+            {
+              "by": "Claude Code",
+              "text": "Raised the threshold to 100.",
+              "at": "2026-11-02T21:55:57.057Z",
+              "snapshot": null
+            }
+          ],
+          "since": null
+        }
+      ],
+      "unviewed": [
+        "src/api/orders.ts",
+        "src/billing/charge.ts",
+        "src/billing/invoice.ts",
+        "src/billing/ledger.ts",
+        "src/api/users.ts",
+        "src/billing/discount.ts",
+        "src/jobs/cleanup.ts",
+        "src/jobs/notify.ts",
+        "src/api/cart.ts",
+        "src/api/router.ts",
+        "src/billing/money.ts",
+        "src/jobs/schedule.ts",
+        "src/api/server.ts",
+        "src/jobs/report.ts",
+        "src/api/checkout.ts",
+        "src/api/format.ts",
+        "src/jobs/retry.ts",
+        "src/billing/format.ts",
+        "src/main.ts",
+        "src/billing/charge.test.ts"
+      ],
+      "moreUnviewed": 2
+    },
+    {
+      "version": 1,
+      "id": 2,
+      "at": "2026-11-02T21:55:55.470Z",
+      "range": null,
+      "comments": [
+        {
+          "version": 1,
+          "id": 4,
+          "tag": "note",
+          "body": "purgeLogs stays as it is: the nightly job calls it.",
+          "status": "sent",
+          "anchor": {
+            "snapshot": "e9c0de750a40c94ccfd65d254ae2dc9a3e129e11",
+            "path": "src/jobs/cleanup.ts",
+            "lines": {
+              "side": "head",
+              "start": 11,
+              "end": 13
+            },
+            "quote": [
+              "export function purgeLogs(days: number): number {",
+              "  return days * 24;",
+              "}"
+            ],
+            "symbol": "purgeLogs"
+          },
+          "created": "2026-11-02T21:55:55.416Z",
+          "updated": "2026-11-02T21:55:55.470Z",
+          "send": 2,
+          "replies": [],
+          "since": null
+        }
+      ],
+      "unviewed": null,
+      "moreUnviewed": 0
+    }
+  ]
+}

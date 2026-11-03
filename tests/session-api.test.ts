@@ -1,12 +1,13 @@
 import { describe, it, expect, beforeAll, afterAll, afterEach, beforeEach, vi } from 'vitest';
 import {
-  APP_WITHOUT_DOCS, AppNotRunningError, AppTimeoutError, LensRead, activeSessions, createCheckpoint, endSession, readArea, readCodeContext, readDocs, readLens, readMap,
-  sendDocs, sendLensWords, startSession,
+  APP_WITHOUT_COMMENTS, APP_WITHOUT_DOCS, AppNotRunningError, AppTimeoutError, LensRead, activeSessions, createCheckpoint, endSession, readArea, readCodeContext, readComments,
+  readDocs, readLens, readMap, replyToComment, sendDocs, sendLensWords, startSession,
 } from '../src/session-api.js';
+import { CommentReply } from '../src/comment-shapes.js';
 import { DocsRead, DocsWritten } from '../src/doc-shapes.js';
 import { ContextRead, SummaryRead } from '../src/map-shapes.js';
 import {
-  DOCS_ANSWERS, FAKE_CITED_LENS, FAKE_LENS, FAKE_LIMITS, FAKE_RANGE, LENS_ANSWER_WITH_FACTS, MAP_ANSWERS, RULES_ANSWERS, closedAppUrl, mapAnswers, startFakeApp, type FakeApp,
+  COMMENT_ANSWERS, DOCS_ANSWERS, FAKE_CITED_LENS, FAKE_LENS, FAKE_LIMITS, FAKE_RANGE, LENS_ANSWER_WITH_FACTS, MAP_ANSWERS, RULES_ANSWERS, closedAppUrl, mapAnswers, startFakeApp, type FakeApp,
 } from './helpers/fake-app.js';
 import { restoreEnv } from './helpers/fixtures.js';
 
@@ -39,7 +40,7 @@ const checkpointInput = { repoPath: '/projects/webshop', title: 'Fix login', aut
 
 describe('sessions', () => {
   it('starts, lists in local time, and ends a session', async () => {
-    const id = await startSession('/projects/webshop', 'Fix login', 'Claude Code');
+    const { sessionId: id } = await startSession('/projects/webshop', 'Fix login', 'Claude Code');
     expect(id).toBe('claude-code-1');
     expect(await activeSessions()).toEqual([
       { id, repoPath: '/projects/webshop', description: 'Fix login', startedAt: '2026-10-08T12:00:00+02:00' },
@@ -375,8 +376,76 @@ describe('docs', () => {
     expect(asked.mock.calls).toEqual([[58_000], [58_000], [20_000]]);
   });
 
+  it('asks the docs route for a range, from the start of the history with an empty base', async () => {
+    expect(DocsRead.parse(DOCS_ANSWERS.range)).toEqual(DOCS_ANSWERS.range);
+    await readDocs({ repoPath, base: null, head: 'c'.repeat(40) });
+    await readDocs({ repoPath, base: 'b'.repeat(40), head: 'c'.repeat(40) });
+    expect(app.requests.map((request) => request.path)).toEqual([
+      `/docs?${new URLSearchParams({ repoPath, base: '', head: 'c'.repeat(40) })}`,
+      `/docs?${new URLSearchParams({ repoPath, base: 'b'.repeat(40), head: 'c'.repeat(40) })}`,
+    ]);
+  });
+
+  it('reads the pages a write left out, and none from an older app', async () => {
+    expect(DocsWritten.parse(DOCS_ANSWERS.writtenLeft)).toEqual(DOCS_ANSWERS.writtenLeft);
+    app.docsWritten = DOCS_ANSWERS.writtenLeft;
+    expect((await sendDocs(write)).left).toEqual([{ page: { area: 'src/jobs' }, why: '✖ Too big: expected string to have <=200 characters\n  → at words.summary' }]);
+    expect(DocsWritten.parse(DOCS_ANSWERS.written)).not.toHaveProperty('left');
+  });
+
   it('reads a map answer from an app before docs', () => {
     expect(SummaryRead.parse(RULES_ANSWERS.summary)).not.toHaveProperty('docs');
     expect(ContextRead.parse(RULES_ANSWERS.context)).not.toHaveProperty('docs');
+  });
+});
+
+describe('review comments', () => {
+  const repoPath = '/projects/webshop';
+  const text = 'It rounds a fractional discount to whole cents.';
+
+  beforeEach(() => {
+    app.requests.length = 0;
+    app.commentRoutes = true;
+    app.commentsAnswer = COMMENT_ANSWERS.open;
+  });
+
+  /** An answer as the server keeps it: each Send and comment without the fields an agent has no use for. */
+  const kept = ({ sends }: typeof COMMENT_ANSWERS.open) => ({
+    sends: sends.map(({ id, at, range, unviewed, moreUnviewed, comments }) => ({
+      id, at, range, unviewed, moreUnviewed, comments: comments.map(({ id: comment, tag, body, anchor, since, replies }) => ({ id: comment, tag, body, anchor, since, replies })),
+    })),
+  });
+
+  it('reads the open comments by Send, as the app answers them', async () => {
+    expect(await readComments(repoPath)).toEqual(kept(COMMENT_ANSWERS.open));
+    app.commentsAnswer = COMMENT_ANSWERS.answered;
+    expect(await readComments(repoPath)).toEqual(kept(COMMENT_ANSWERS.answered));
+    expect(app.requests.map((request) => request.path)).toEqual(Array(2).fill(`/comments?${new URLSearchParams({ repoPath })}`));
+  });
+
+  it("stores a reply with the agent as author, and passes on the app's reason for a comment that is not open", async () => {
+    expect(CommentReply.parse(COMMENT_ANSWERS.reply.reply)).toEqual(COMMENT_ANSWERS.reply.reply);
+    const reply = await replyToComment({ repoPath, id: 2, text, author: 'Claude Code' });
+    expect(reply).toEqual({ by: 'Claude Code', text, at: expect.any(String), snapshot: null });
+    expect(app.requestsTo('/comments/reply')).toEqual([{ repoPath, id: 2, text, author: 'Claude Code' }]);
+    expect((await readComments(repoPath)).sends.flatMap((send) => send.comments).find((comment) => comment.id === 2)?.replies).toEqual([reply]);
+    await expect(replyToComment({ repoPath, id: 99, text: 'Done.', author: 'Claude Code' })).rejects.toThrow(`ShadowGit: ${COMMENT_ANSWERS.noComment.error}`);
+  });
+
+  it('asks for an app update when the comment routes are missing, and only then', async () => {
+    expect(APP_WITHOUT_COMMENTS).toBe('This version of ShadowGit has no review comments for AI assistants. Ask the user to update the ShadowGit app.');
+    app.commentRoutes = false;
+    await expect(readComments(repoPath)).rejects.toThrow(APP_WITHOUT_COMMENTS);
+    await expect(replyToComment({ repoPath, id: 2, text, author: 'Claude Code' })).rejects.toThrow(APP_WITHOUT_COMMENTS);
+    app.commentRoutes = true;
+    await expect(replyToComment({ repoPath, id: 99, text, author: 'Claude Code' })).rejects.toThrow('ShadowGit: There is no open comment #99: it was never sent, or is resolved');
+  });
+
+  it('answers the open comments a session starts with, and none from an older app', async () => {
+    expect(await startSession(repoPath, 'Fix login', 'Claude Code')).toEqual({ sessionId: expect.any(String), openComments: 4 });
+    app.commentsAnswer = { sends: [] };
+    expect((await startSession(repoPath, 'Fix login', 'Claude Code')).openComments).toBe(0);
+    app.answers['/session/start'] = COMMENT_ANSWERS.start;
+    expect(await startSession(repoPath, 'Fix login', 'Claude Code')).toEqual({ sessionId: COMMENT_ANSWERS.start.sessionId, openComments: 4 });
   });
 });

@@ -33,7 +33,10 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 
-const DOCS_STEP = "The session's last step: the docs pages of the areas it changed, src/billing and src/jobs, need words, so the pages the user reads in ShadowGit describe the code as it is now. A page with no words can start short, from its facts and the code you read. get_docs, then write_docs.";
+/** The step after the Lens's words: the pages of the range they are for, read again with get_docs by that range. */
+const docsStep = (pages: string, base: string | null, head: string) =>
+  `The session's last step: the docs pages of the areas it changed, ${pages}, need words, so the pages the user reads in ShadowGit describe the code as it is now. A page with no words can start short, from its facts and the code you read. get_docs with base ${JSON.stringify(base)} and head ${JSON.stringify(head)}, then write_docs.`;
+const DOCS_STEP = docsStep('src/billing and src/jobs', FAKE_RANGE.base, FAKE_RANGE.head);
 
 describe('get_lens', () => {
   it("reads the latest session's lens of the current project, every id with its code, and says how to word it", async () => {
@@ -167,7 +170,7 @@ describe('write_lens_words', () => {
   it('asks to update the docs pages the session changed when the app lists some', async () => {
     const timeout = vi.spyOn(AbortSignal, 'timeout');
     const result = await writeLensWords({ ...FAKE_RANGE, summary: 'Failed payments wait for another try.' }, 'Claude Code');
-    expect(app.requests.filter((request) => request.path.startsWith('/docs?')).map((request) => request.path)).toEqual([`/docs?${new URLSearchParams({ repoPath: project })}`]);
+    expect(app.requests.filter((request) => request.path.startsWith('/docs?')).map((request) => request.path)).toEqual([`/docs?${new URLSearchParams({ repoPath: project, ...FAKE_RANGE })}`]);
     // The words' 58 s, and the docs' 20 s: the step is never worth a long wait
     expect(timeout.mock.calls).toEqual(expect.arrayContaining([[20_000]]));
     expect(result.structuredContent).toMatchObject({ next: DOCS_STEP });
@@ -180,22 +183,20 @@ describe('write_lens_words', () => {
     );
   });
 
-  it("asks for the latest AI session's pages only when the words are for its range", async () => {
-    const docsAsked = () => app.requests.filter((request) => request.path.startsWith('/docs?'));
-    // The session's range, as get_lens without a range answers it: short hashes name it too
-    const short = await writeLensWords({ base: FAKE_RANGE.base.slice(0, 7), head: FAKE_RANGE.head.slice(0, 7), summary: 'A summary.' }, 'Claude Code');
-    expect(short.structuredContent).toMatchObject({ next: DOCS_STEP });
-    expect(app.requests.filter((request) => request.path.startsWith('/lens?')).map((request) => request.path)).toEqual([`/lens?${new URLSearchParams({ repoPath: project })}`]);
+  it('asks for the pages of the range the words are for, without reading the Lens first', async () => {
+    const docsAsked = () => app.requests.filter((request) => request.path.startsWith('/docs?')).map((request) => request.path);
+    app.docsAnswer = DOCS_ANSWERS.range;
+    // Another range than the latest session's, as get_lens answers it
+    const other = { base: 'a'.repeat(40), head: FAKE_RANGE.head };
+    const result = await writeLensWords({ ...other, summary: 'A summary.' }, 'Claude Code');
+    expect(result.structuredContent).toMatchObject({ next: docsStep('src/api, src/billing and src/jobs', other.base, other.head) });
+    expect(docsAsked()).toEqual([`/docs?${new URLSearchParams({ repoPath: project, ...other })}`]);
+    expect(app.requests.filter((request) => request.path.startsWith('/lens?'))).toEqual([]);
+    // From the start of the history, as the app names it: an empty base
     app.requests.length = 0;
-    // Another range's words: the latest session's pages are not this change's
-    const other = await writeLensWords({ base: 'a'.repeat(40), head: FAKE_RANGE.head, summary: 'A summary.' }, 'Claude Code');
-    expect(other.structuredContent).not.toHaveProperty('next');
-    expect(docsAsked()).toEqual([]);
-    // A session from the start of the history
-    app.lensAnswer = { range: { base: null, head: FAKE_RANGE.head }, lens: FAKE_LENS };
     const first = await writeLensWords({ base: null, head: FAKE_RANGE.head, summary: 'A summary.' }, 'Claude Code');
-    expect(first.structuredContent).toMatchObject({ next: DOCS_STEP });
-    expect((await writeLensWords({ ...FAKE_RANGE, summary: 'A summary.' }, 'Claude Code')).structuredContent).not.toHaveProperty('next');
+    expect(first.structuredContent).toMatchObject({ next: docsStep('src/api, src/billing and src/jobs', null, FAKE_RANGE.head) });
+    expect(docsAsked()).toEqual([`/docs?${new URLSearchParams({ repoPath: project, base: '', head: FAKE_RANGE.head })}`]);
   });
 
   it('answers as before when the app has no docs, counts past its deadline, has none to update, or answers a shape it does not read', async () => {

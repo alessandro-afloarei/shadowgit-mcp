@@ -2,6 +2,52 @@
 
 All notable changes to the ShadowGit MCP Server will be documented in this file.
 
+## [2.7.0] - 2026-11-02
+
+### Added
+- Review comments the person sends to their assistant from ShadowGit:
+  - `get_review_comments` reads the sent comments the person hasn't resolved, grouped by Send, oldest first. Each
+    comment has its tag (change, question or note), its words and where it is: the snapshot, the file, the lines and
+    their side, the lines quoted as they read then, and the definition around them. It also has the snapshot that
+    changed its lines since, and the replies so far. Each Send has the range the person had open and the files of it
+    they hadn't viewed. Its `next` lists the comments to reply to.
+  - `reply_to_review_comment` replies to one comment as the assistant, in up to 1,000 characters. ShadowGit shows the
+    reply under the comment with a snapshot: during a session, the one its checkpoint or end makes. Replying never
+    resolves a comment.
+  - Their descriptions say to change only what each comment asks, to ask the person before anything else, to reply to
+    each, and that only the person resolves one.
+- `start_session` names the open comments when there are some: "The person sent 2 review comments on this project.
+  Read them with get_review_comments when they ask you to address their review." It never asks to act on them
+  unasked.
+- `npm run eval:comments` runs a real Claude Code, told "Address my ShadowGit review comments.", on four comments the
+  real app answered: two changes, a question and a note. 10 of 10 runs did all of these (the bar is 8 of 10):
+  - read the comments before their first edit;
+  - replied to all four;
+  - changed the two commented definitions as asked, and no other code.
+
+### Changed
+- `write_lens_words`' docs step reads the pages of the range its words are for, without reading the session's Lens
+  first. Words for any range now get that range's pages, and the step names the range for `get_docs`.
+- `get_docs` takes `base` and `head`: the pages that range changed whose words are missing or behind.
+- `write_docs` sends every page and lists the pages the app left out, with why. The app now checks each page's words on
+  its own, so the server's own copy of those rules is gone. With an app before 0.4.0, a page past the limits refuses
+  the whole write, as before 2.6.1; the app's answer names the page.
+- The instructions are unchanged: they have 4 characters left under 1,800. The tools' names and descriptions are
+  enough on their own. "Address my ShadowGit review comments" and "Read my review", the app's own words as it sends comments,
+  reached `get_review_comments` every time (`npm run eval`).
+- With these changes:
+  - `npm run eval:docs`: 9 of 10 runs wrote both pages after the Lens's words (4 of 5, then 5 of 5). 2.6.1 measured 8
+    of 10.
+  - `npm run eval`: 12 of 14 phrases, then 13 of 14.
+    - "What does the billing area do?" missed twice. The first run answered from `get_map` and the files; the second
+      asked `get_docs` by the area's label rather than its id.
+    - "Document this project in ShadowGit" missed once: it wrote every page by naming them, not with `all`.
+    - Run alone, "What does the billing area do?" passed 3 of 3 on 2.7.0, and 3 of 3 on 2.6.1.
+
+The review comments and the docs of any range need ShadowGit 0.4.0. Against an older app, the comment tools answer
+that the app needs an update, `start_session` names no comments, and the docs step names the latest AI session's pages
+whatever range the words are for.
+
 ## [2.6.1] - 2026-10-28
 
 ### Changed
