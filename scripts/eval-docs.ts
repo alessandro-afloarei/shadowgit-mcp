@@ -37,8 +37,8 @@ function pagesWritten(requests: readonly Request[]): Set<string> {
 
 /** The pass rule reads written pages after the words alone, and both of them. */
 function selfCheck(): void {
-  const words: Request = { path: '/lens/words', body: {} };
-  const docs = (...pages: SentPage[]): Request => ({ path: '/docs', body: { pages } });
+  const words: Request = { path: '/lens/words', body: {}, client: null };
+  const docs = (...pages: SentPage[]): Request => ({ path: '/docs', body: { pages }, client: null });
   const worded = (area: string): SentPage => ({ area, words: { summary: 'Charges cards.', body: [[{ text: 'Charges cards.' }]] } });
   const cases: [Request[], string[]][] = [
     [[words, docs(worded('src/billing'), { area: 'src/jobs', holds: true })], PAGES],

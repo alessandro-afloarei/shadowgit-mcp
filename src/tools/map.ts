@@ -1,6 +1,6 @@
 import type { CallToolResult, McpServer } from '@modelcontextprotocol/server';
 import * as z from 'zod/v4';
-import { clientName } from '../client-name.js';
+import { asClient } from '../client-name.js';
 import { ContextRead, MapRead } from '../map-shapes.js';
 import { resolveRepo } from '../repos.js';
 import { readArea, readCodeContext, readMap } from '../session-api.js';
@@ -179,7 +179,7 @@ export function registerMap(server: McpServer): void {
       outputSchema: MapOutput,
       annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
     },
-    (args, ctx) => getMap(args, clientName(server, ctx)),
+    asClient(server, getMap),
   );
   server.registerTool(
     'get_code_context',
@@ -200,6 +200,6 @@ export function registerMap(server: McpServer): void {
       outputSchema: ContextOutput,
       annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
     },
-    (args, ctx) => getCodeContext(args, clientName(server, ctx)),
+    asClient(server, getCodeContext),
   );
 }

@@ -1,6 +1,6 @@
 import type { CallToolResult, McpServer } from '@modelcontextprotocol/server';
 import * as z from 'zod/v4';
-import { clientName } from '../client-name.js';
+import { asClient } from '../client-name.js';
 import { DocPiece, DocsCursor, DocsRead, DocsWritten, type DocKey, type DocWords } from '../doc-shapes.js';
 import { resolveRepo } from '../repos.js';
 import { readDocs, sendDocs, type AppDocWrite } from '../session-api.js';
@@ -237,7 +237,7 @@ export function registerDocs(server: McpServer): void {
       outputSchema: DocsOutput,
       annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
     },
-    getDocs,
+    asClient(server, getDocs),
   );
   server.registerTool(
     'write_docs',
@@ -254,6 +254,6 @@ export function registerDocs(server: McpServer): void {
       // Destructive: words written for a page replace the ones it had
       annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: true, openWorldHint: false },
     },
-    (args, ctx) => writeDocs(args, clientName(server, ctx)),
+    asClient(server, writeDocs),
   );
 }

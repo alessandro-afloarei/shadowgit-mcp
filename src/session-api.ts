@@ -3,6 +3,7 @@ import { CommentReply, CommentsRead } from './comment-shapes.js';
 import { DocsRead, DocsWritten, type DocKey, type DocsCursor, type DocWords } from './doc-shapes.js';
 import { AreaRead, ContextRead, SummaryRead } from './map-shapes.js';
 import { CheckpointRules, Range, RuleCheck, RulesFailure } from './rule-shapes.js';
+import { callingClient } from './client-name.js';
 import { toLocalIso } from './time.js';
 
 export class AppNotRunningError extends Error {
@@ -128,6 +129,12 @@ function endpoint(): string {
   return (URL.canParse(url) && new URL(url).host) || 'the address in SHADOWGIT_SESSION_API';
 }
 
+/** The header naming the client of the tool call running, which the app shows as connected; none outside a call. */
+function clientHeader(): Record<string, string> {
+  const client = callingClient.getStore();
+  return client === undefined ? {} : { 'x-shadowgit-client': client };
+}
+
 /**
  * A POST when there is a body, else a GET. An app without the route throws `missing`; any status but 200 and the ones
  * in `accept` throws; the caller handles those.
@@ -142,7 +149,7 @@ async function request(
   try {
     response = await fetch(`${baseUrl()}${route}`, {
       method: body ? 'POST' : 'GET',
-      headers: body ? { 'content-type': 'application/json' } : undefined,
+      headers: { ...(body && { 'content-type': 'application/json' }), ...clientHeader() },
       body: body ? JSON.stringify(body) : undefined,
       signal: AbortSignal.timeout(timeoutMs),
     });
