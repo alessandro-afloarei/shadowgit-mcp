@@ -59,7 +59,7 @@ function stateLine({ state, words, changes, countFailure }: Page): string {
 }
 
 function factLines(facts: Facts): string[] {
-  const links = (each: readonly { label: string; count: number }[]) => (each.length === 0 ? 'none' : each.map(({ label, count }) => `${label} (${count})`).join(', '));
+  const links = (each: readonly { label: string; count: number }[]) => (each.length === 0 ? 'none' : each.map(({ label, count }) => `${quote(label)} (${count})`).join(', '));
   if ('folder' in facts) {
     return [
       `  Facts: folder ${facts.folder}; ${plural(facts.files, 'file')}, ${plural(facts.symbols, 'symbol')}; layers ${facts.layers.join(', ') || 'none'}.`,
@@ -74,9 +74,9 @@ function factLines(facts: Facts): string[] {
   return [
     `  Facts: ${plural(files, 'file')}, ${plural(symbols, 'symbol')}, ${plural(areas, 'area')}, ${plural(calls, 'call')}, ${plural(processes, 'process')}.`,
     `  Layers: ${facts.layers.map((layer) => `${layer.name} (${layer.kind}, ${plural(layer.files, 'file')})`).join(', ')}.`,
-    `  Areas: ${list(facts.areas, (area) => `${area.label} (area ${area.id}): ${plural(area.files, 'file')}, ${plural(area.symbols, 'symbol')}`, '; ')}.`,
-    ...(facts.links.total > 0 ? [`  Links between areas: ${list(facts.links, ({ from, to, count }) => `${from.label} → ${to.label} (${count})`)}.`] : []),
-    ...(facts.processes.total > 0 ? [`  Processes: ${list(facts.processes, ({ label, areas: through }) => `${label} (${through.join(' → ')})`, '; ')}.`] : []),
+    `  Areas: ${list(facts.areas, (area) => `${quote(area.label)} (area ${area.id}): ${plural(area.files, 'file')}, ${plural(area.symbols, 'symbol')}`, '; ')}.`,
+    ...(facts.links.total > 0 ? [`  Links between areas: ${list(facts.links, ({ from, to, count }) => `${quote(from.label)} → ${quote(to.label)} (${count})`)}.`] : []),
+    ...(facts.processes.total > 0 ? [`  Processes: ${list(facts.processes, ({ label, areas: through }) => `${label} (${through.map(quote).join(' → ')})`, '; ')}.`] : []),
   ];
 }
 

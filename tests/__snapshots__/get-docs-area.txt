@@ -2,7 +2,7 @@ webshop's docs pages, at snapshot 32cfc99c; the map is drawn from snapshot 32cfc
 
 Page "billing" (area src/billing): 1 change since its words, written by Claude Code at f62bdb89.
   Facts: folder src/billing; 6 files, 16 symbols; layers billing.
-  Depends on: none. Depended on by: jobs (5), api (3).
+  Depends on: none. Depended on by: "jobs" (5), "api" (3).
   Processes: StartServer -> RoundCents, StartServer -> RecordPayment, InvoiceLine -> RoundCents, RetryFailedCharges -> RoundCents, RetryFailedCharges -> RecordPayment.
   Most depended on: roundCents (src/billing/money.ts:1): 4 dependents; chargeCard (src/billing/charge.ts:5): 2 dependents; recordPayment (src/billing/ledger.ts:3): 2 dependents; lateFee (src/billing/charge.ts:18): 1 dependent; discountRate (src/billing/discount.ts:7): 1 dependent; formatAmount (src/billing/format.ts:1): 1 dependent; invoiceTotal (src/billing/invoice.ts:5): 1 dependent …and 2 more.
   Its words:

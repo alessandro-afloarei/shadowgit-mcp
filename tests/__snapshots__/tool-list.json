@@ -142,7 +142,7 @@
       "$schema": "https://json-schema.org/draft/2020-12/schema",
       "properties": {
         "area": {
-          "description": "An area's label as get_map names it, or a folder path, which covers every file under it. Leave out for the whole project",
+          "description": "An area's label or id as get_map names it, or a folder path, which covers every file under it. Leave out for the whole project",
           "minLength": 1,
           "type": "string"
         },
@@ -591,6 +591,10 @@
                         "maximum": 9007199254740991,
                         "minimum": -9007199254740991,
                         "type": "integer"
+                      },
+                      "id": {
+                        "description": "The area's id: it stays while its label, which names what the area holds, changes",
+                        "type": "string"
                       },
                       "label": {
                         "type": "string"

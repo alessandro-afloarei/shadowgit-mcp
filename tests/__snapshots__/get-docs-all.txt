@@ -3,19 +3,19 @@ webshop's docs pages, at snapshot 7645e403; the map is drawn from snapshot 7645e
 Page "Overview" (the Overview): no words yet.
   Facts: 22 files, 90 symbols, 6 areas, 34 calls, 13 processes.
   Layers: admin (folder, 1 file), api (folder, 7 files), billing (folder, 6 files), jobs (folder, 5 files), mail (folder, 1 file), search (folder, 1 file).
-  Areas: api (area src/api): 7 files, 17 symbols; billing (area src/billing): 6 files, 16 symbols; admin (area src/admin): 2 files, 15 symbols; mail (area src/mail): 1 file, 15 symbols; search (area src/search): 1 file, 15 symbols; jobs (area src/jobs): 5 files, 12 symbols.
-  Links between areas: jobs → billing (5), admin → api (3), api → billing (3).
-  Processes: StartServer -> RoundCents (api → billing); StartServer -> RecordPayment (api → billing); StartServer -> Shipping (api); InvoiceLine -> RoundCents (billing); CleanupCarts -> MaxDelay (jobs); StartServer -> ValidateCart (api); StartServer -> UserName (api); RetryFailedCharges -> RoundCents (jobs → billing); RetryFailedCharges -> RecordPayment (jobs → billing); RetryFailedCharges -> MaxDelay (jobs) …and 3 more.
+  Areas: "api" (area src/api): 7 files, 17 symbols; "billing" (area src/billing): 6 files, 16 symbols; "admin" (area src/admin): 2 files, 15 symbols; "mail" (area src/mail): 1 file, 15 symbols; "search" (area src/search): 1 file, 15 symbols; "jobs" (area src/jobs): 5 files, 12 symbols.
+  Links between areas: "jobs" → "billing" (5), "admin" → "api" (3), "api" → "billing" (3).
+  Processes: StartServer -> RoundCents ("api" → "billing"); StartServer -> RecordPayment ("api" → "billing"); StartServer -> Shipping ("api"); InvoiceLine -> RoundCents ("billing"); CleanupCarts -> MaxDelay ("jobs"); StartServer -> ValidateCart ("api"); StartServer -> UserName ("api"); RetryFailedCharges -> RoundCents ("jobs" → "billing"); RetryFailedCharges -> RecordPayment ("jobs" → "billing"); RetryFailedCharges -> MaxDelay ("jobs") …and 3 more.
 
 Page "api" (area src/api): no words yet.
   Facts: folder src/api; 7 files, 17 symbols; layers api.
-  Depends on: billing (3). Depended on by: admin (3).
+  Depends on: "billing" (3). Depended on by: "admin" (3).
   Processes: StartServer -> RoundCents, StartServer -> RecordPayment, StartServer -> Shipping, StartServer -> ValidateCart, StartServer -> UserName, ListOrders -> OrderId.
   Most depended on: validateCart (src/api/cart.ts:1): 1 dependent; cartTotal (src/api/cart.ts:6): 1 dependent; shipping (src/api/cart.ts:10): 1 dependent; checkout (src/api/checkout.ts:5): 1 dependent; formatAmount (src/api/format.ts:1): 1 dependent; formatDate (src/api/format.ts:5): 1 dependent; createOrder (src/api/orders.ts:3): 1 dependent …and 5 more.
 
 Page "admin" (area src/admin): no words yet.
   Facts: folder src/admin; 2 files, 15 symbols; layers admin.
-  Depends on: api (3). Depended on by: none.
+  Depends on: "api" (3). Depended on by: none.
 
 Page "mail" (area src/mail): no words yet.
   Facts: folder src/mail; 1 file, 15 symbols; layers mail.
