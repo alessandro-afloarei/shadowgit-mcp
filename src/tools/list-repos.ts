@@ -108,7 +108,7 @@ function render(listing: Listing, reasons: (string | null)[], timedOut: boolean)
     snapshotText(r, reasons[i] ?? null),
     ...(r.session ? [`session "${r.session.description}" active since ${r.session.started_at}`] : []),
   ].join(', '));
-  if (timedOut) lines.push('The ShadowGit app did not answer in time, so sessions and checkpoints may be unavailable.');
-  else if (!listing.app_running) lines.push('The ShadowGit app is not running, so sessions and checkpoints are unavailable.');
+  if (timedOut) lines.push('The ShadowGit app did not answer in time, so sessions and saved snapshots may be unavailable.');
+  else if (!listing.app_running) lines.push('The ShadowGit app is not running, so sessions and saved snapshots are unavailable.');
   return lines.join('\n');
 }

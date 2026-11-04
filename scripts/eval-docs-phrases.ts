@@ -18,6 +18,10 @@ interface Context {
   answer: string;
 }
 
+// list_repos asks the app for its active sessions; the answer alone could come from the working directory.
+const LISTS_PROJECTS = { passed: ({ app, answer }: Context) => answer.includes('webshop') && app.requestsTo('/session/active').length > 0 };
+const SAVES_FIXED_AUTH_BUG = { passed: ({ app }: Context) => app.requestsTo('/checkpoint').some((b) => /fixed auth bug/i.test(String(b.title))) };
+
 /** The comments the person sent on the webshop: with the ShadowGit tools alone, reading them is the step it can take. */
 const READS_COMMENTS = {
   prepare: (app: FakeApp, project: string) => {
@@ -29,11 +33,9 @@ const READS_COMMENTS = {
 
 // The phrases as docs.shadowgit.com writes them; its example project is webshop, like the temporary one.
 const CASES: { phrase: string; prepare?: (app: FakeApp, project: string) => void; passed: (c: Context) => boolean }[] = [
-  {
-    phrase: 'Show me my ShadowGit repositories',
-    // list_repos asks the app for its active sessions; the answer alone could come from the working directory.
-    passed: ({ app, answer }) => answer.includes('webshop') && app.requestsTo('/session/active').length > 0,
-  },
+  { phrase: 'Show me my ShadowGit repositories', ...LISTS_PROJECTS },
+  // The same asks in ShadowGit's own words, as its docs write them from 2.9.0 on
+  { phrase: 'Show me my ShadowGit projects', ...LISTS_PROJECTS },
   { phrase: 'What changed in the last hour?', passed: ({ answer }) => answer.includes('checkout.ts') },
   { phrase: 'Show me the history of Header.tsx', passed: ({ answer }) => answer.includes('Restyle header') },
   {
@@ -54,10 +56,8 @@ const CASES: { phrase: string; prepare?: (app: FakeApp, project: string) => void
     phrase: 'Start a ShadowGit session for debugging',
     passed: ({ app, project }) => app.requestsTo('/session/start').some((b) => b.repoPath === project),
   },
-  {
-    phrase: "Create a checkpoint with message 'Fixed auth bug'",
-    passed: ({ app }) => app.requestsTo('/checkpoint').some((b) => /fixed auth bug/i.test(String(b.title))),
-  },
+  { phrase: "Create a checkpoint with message 'Fixed auth bug'", ...SAVES_FIXED_AUTH_BUG },
+  { phrase: "Save a snapshot in ShadowGit named 'Fixed auth bug'", ...SAVES_FIXED_AUTH_BUG },
   {
     phrase: 'End the current ShadowGit session',
     prepare: (app, project) => {

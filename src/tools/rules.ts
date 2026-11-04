@@ -29,15 +29,15 @@ function fileLines(file: Check['file']): string[] {
   if (file === null) return [];
   const quoted = (texts: string[]) => texts.map(quote).join(', ');
   const parts = [file.added.length > 0 && `adds ${quoted(file.added)}`, file.removed.length > 0 && `removes ${quoted(file.removed)}`].filter(Boolean);
-  return [parts.length === 0 ? '- This range changes .shadowgit-rules.' : `- This range changes .shadowgit-rules: ${parts.join(', ')}.`];
+  return [parts.length === 0 ? '- This change edits .shadowgit-rules.' : `- This change edits .shadowgit-rules: ${parts.join(', ')}.`];
 }
 
 /** The rules that name no link the range adds: all of them, or the others. */
 function quietLines(check: Check): string[] {
   const left = check.rules - check.matches.length;
   if (left <= 0) return [];
-  if (check.matches.length === 0) return ['- No rule names a link this range adds.'];
-  return [`- ${left === 1 ? 'The other rule names' : `The other ${left} rules name`} no link this range adds.`];
+  if (check.matches.length === 0) return ['- No rule names a link this change adds.'];
+  return [`- ${left === 1 ? 'The other rule names' : `The other ${left} rules name`} no link this change adds.`];
 }
 
 /** A range's check: how many rules, each that names links the range adds with those links, the rest, the file's changes. */
@@ -45,7 +45,7 @@ function checkLines(check: Check, range?: z.infer<typeof Range>): string[] {
   return [
     `The project's rules (.shadowgit-rules): ${check.rules} checked${range === undefined ? '' : `, over snapshots ${snapshots(range)}`}.`,
     ...check.matches.flatMap(({ rule, count, links, steps }) => [
-      `- ${ruleLine(rule)}: names ${plural(count, 'link')} this range adds${steps.length > 0 ? ` (steps ${steps.join(', ')})` : ''}`,
+      `- ${ruleLine(rule)}: names ${plural(count, 'link')} this change adds${steps.length > 0 ? ` (steps ${steps.join(', ')})` : ''}`,
       ...links.map((link) => `  ${quote(link)}`),
       ...(count > links.length ? [`  and ${count - links.length} more`] : []),
     ]),

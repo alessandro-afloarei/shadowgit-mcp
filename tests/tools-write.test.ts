@@ -30,6 +30,7 @@ beforeEach(() => {
   app.sessions.length = 0;
   app.checkpointStatus = 200;
   app.endCommit = null;
+  app.endReview = null;
   app.commentsAnswer = { sends: [] };
 });
 
@@ -121,17 +122,17 @@ describe('checkpoint', () => {
     });
   });
 
-  it('reports nothing to checkpoint as a result, not an error', async () => {
+  it('reports nothing to save as a result, not an error', async () => {
     app.checkpointStatus = 409;
     const result = await checkpoint({ title: 'Nothing' }, 'Claude Code');
     expect(result.structuredContent).toEqual({ commit: null, title: 'Nothing', files_changed: 0, repo: 'webshop' });
-    expect(textOf(result)).toBe('No changes since the last snapshot; nothing to checkpoint.');
+    expect(textOf(result)).toBe('No changes since the last snapshot; nothing to save.');
     expect(app.requests.at(-1)?.body).not.toHaveProperty('message');
   });
 
   it('asks for an app update when the route is missing', async () => {
     app.checkpointStatus = 404;
-    await expect(checkpoint({ title: 'Fix' }, 'Claude Code')).rejects.toThrow("can't create checkpoints for AI assistants");
+    await expect(checkpoint({ title: 'Fix' }, 'Claude Code')).rejects.toThrow("can't save snapshots for AI assistants");
   });
 
   it('names the HTTP status when the app fails without JSON', async () => {
@@ -145,10 +146,10 @@ describe('end_session', () => {
     app.sessions.push(fakeSession({ id: 'claude-code-7', repoPath: project }));
     const result = await endSession({});
     // The step after a session, in the answer the model reads at that moment: the Lens of what it changed
-    expect(result.structuredContent).toEqual({ ended: ['claude-code-7'], repo: 'webshop', next: expect.stringMatching(/^If its edits are in a checkpoint: get_lens, then write_lens_words/) });
-    expect(textOf(result)).toContain('Next: If its edits are in a checkpoint: get_lens, then write_lens_words');
-    // The Lens reads snapshots: edits ended without a checkpoint are not in one yet
-    expect(textOf(result)).toContain('if not, checkpoint them first');
+    expect(result.structuredContent).toEqual({ ended: ['claude-code-7'], repo: 'webshop', next: expect.stringMatching(/^If its edits are in a saved snapshot: get_lens, then write_lens_words/) });
+    expect(textOf(result)).toContain('Next: If its edits are in a saved snapshot: get_lens, then write_lens_words');
+    // The Lens reads snapshots: edits ended without a saved snapshot are not in one yet
+    expect(textOf(result)).toContain('if not, save them with `checkpoint` first');
     expect(app.requests.at(-1)).toEqual({ path: '/session/end', body: { sessionId: 'claude-code-7' }, client: null });
   });
 
@@ -158,7 +159,24 @@ describe('end_session', () => {
     const result = await endSession({});
     expect(result.structuredContent).toEqual({ ended: ['claude-code-8'], repo: 'webshop', next: expect.stringMatching(/^get_lens, then write_lens_words/) });
     expect(textOf(result)).toContain('Ended claude-code-8 on webshop at snapshot ffffffff, which holds its edits. Automatic snapshots resumed.');
-    expect(textOf(result)).not.toContain('checkpoint them first');
+    expect(textOf(result)).not.toContain('save them with `checkpoint` first');
+  });
+
+  it('relays where the app reviews a session', async () => {
+    app.endCommit = 'f'.repeat(40);
+    app.endReview = 'Open webshop in ShadowGit, then Review session.';
+    app.sessions.push(fakeSession({ id: 'claude-code-9', repoPath: project }));
+    const result = await endSession({});
+    expect(result.structuredContent).toMatchObject({ next: expect.stringMatching(/ Then tell the user: Open webshop in ShadowGit, then Review session\.$/) });
+    expect(textOf(result)).toMatch(/ Then tell the user: Open webshop in ShadowGit, then Review session\.$/);
+  });
+
+  it("says nothing of Review for an app that doesn't", async () => {
+    app.endCommit = 'f'.repeat(40);
+    app.sessions.push(fakeSession({ id: 'claude-code-10', repoPath: project }));
+    const result = await endSession({});
+    expect(textOf(result)).not.toContain('Review session');
+    expect(result.structuredContent).toMatchObject({ next: expect.stringMatching(/in your words\.$/) });
   });
 
   it('succeeds with nothing to do when no session is active', async () => {
@@ -190,7 +208,7 @@ describe('end_session', () => {
     process.env.CLAUDE_PROJECT_DIR = tempDir('nowhere');
     const result = await endSession({ session_id: 'cursor-2' });
     // Another project's session: the next steps name it, or they would read the current project's Lens
-    expect(result.structuredContent).toEqual({ ended: ['cursor-2'], repo: 'blog', next: expect.stringMatching(/^For blog, pass repo "blog" to each tool\. If its edits are in a checkpoint: get_lens/) });
+    expect(result.structuredContent).toEqual({ ended: ['cursor-2'], repo: 'blog', next: expect.stringMatching(/^For blog, pass repo "blog" to each tool\. If its edits are in a saved snapshot: get_lens/) });
   });
 
   it('names another project by its path in the steps that follow when its name is shared', async () => {

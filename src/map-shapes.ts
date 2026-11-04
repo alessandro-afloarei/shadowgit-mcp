@@ -82,7 +82,16 @@ export const MapSummary = z.object({
   commit: z.string(),
   counts: z.object({ files: z.number().int(), symbols: z.number().int(), areas: z.number().int(), calls: z.number().int(), processes: z.number().int() }),
   layers: z.array(z.object({ name: z.string(), kind: z.string(), files: z.number().int() })),
-  areas: listed(z.object({ label: z.string(), path: z.string(), files: z.number().int(), symbols: z.number().int(), layers: z.array(z.string()) })).describe(
+  areas: listed(
+    z.object({
+      label: z.string(),
+      path: z.string(),
+      files: z.number().int(),
+      symbols: z.number().int(),
+      layers: z.array(z.string()),
+      id: z.string().optional().describe("The area's id: it stays while its label, which names what the area holds, changes"),
+    }),
+  ).describe(
     'Largest first. An area is named by its label; its path is the folder it covers',
   ),
   links: listed(z.object({ from: z.string(), to: z.string(), count: z.number().int() })).describe('Calls and imports from one area into another, heaviest first'),

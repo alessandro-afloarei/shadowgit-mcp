@@ -41,6 +41,8 @@ export interface FakeApp {
   checkpointRules: object | null;
   /** The snapshot an app from 0.3.13 answers a session's end with, holding the edits it held back; null is an older app. */
   endCommit: string | null;
+  /** Where a ShadowGit after 0.4.0 says the person reviews the ended session; null is an older app. */
+  endReview: string | null;
   /** False is an app without the Lens routes: they answer the catch-all 404. */
   lensRoutes: boolean;
   /** What GET /lens answers: a range, its lens or null for a range that changes no code, and its rules' check as an app that has them sends it. */
@@ -221,6 +223,7 @@ async function listen(): Promise<FakeApp> {
     snapshotsWithoutSession: false,
     checkpointRules: null,
     endCommit: null,
+    endReview: null,
     lensRoutes: true,
     lensAnswer: { range: FAKE_RANGE, lens: FAKE_LENS },
     answers: {},
@@ -279,7 +282,7 @@ async function listen(): Promise<FakeApp> {
     }
     if (route === '/session/end') {
       app.sessions = app.sessions.filter((s) => s.id !== body.sessionId);
-      return json(200, { success: true, ...(app.endCommit !== null && { commit: app.endCommit }) });
+      return json(200, { success: true, ...(app.endCommit !== null && { commit: app.endCommit }), ...(app.endReview !== null && { review: app.endReview }) });
     }
     if (route === '/checkpoint') {
       // Read once the commit is made: a check of the project reads its new HEAD
@@ -303,7 +306,7 @@ async function listen(): Promise<FakeApp> {
     }
     if (app.lensRoutes && route.startsWith('/lens?')) return json(200, { success: true, ...app.lensAnswer, limits: FAKE_LIMITS });
     if (app.lensRoutes && route === '/lens/words') {
-      if (app.wordsStatus === 409) return json(409, { success: false, error: 'Nothing in this range changes code: it has no lens to word' });
+      if (app.wordsStatus === 409) return json(409, { success: false, error: 'This change touches no code: it has no Lens to word' });
       if (app.wordsStatus === 400) return json(400, { success: false, error: "Not the Lens's words: ✖ Invalid input: expected string, received array\n  → at steps[0].body" });
       return json(200, { success: true, applied: { summary: true, steps: 1, components: 1, layers: 0, flows: 0 }, ignored: ['c99'] });
     }

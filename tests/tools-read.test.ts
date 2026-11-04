@@ -199,7 +199,7 @@ describe('list_repos', () => {
     const result = await listRepos();
 
     expect(result.structuredContent).toMatchObject({ app_running: false });
-    expect(textOf(result)).toContain('The ShadowGit app is not running, so sessions and checkpoints are unavailable.');
+    expect(textOf(result)).toContain('The ShadowGit app is not running, so sessions and saved snapshots are unavailable.');
   });
 
   it('reports app_running false when the app is too busy to answer', async () => {
@@ -212,7 +212,7 @@ describe('list_repos', () => {
     });
 
     expect(result.structuredContent).toMatchObject({ app_running: false, repos: [{ name: 'webshop' }, { name: 'blog' }, { name: 'deleted' }] });
-    expect(textOf(result)).toContain('The ShadowGit app did not answer in time, so sessions and checkpoints may be unavailable.');
+    expect(textOf(result)).toContain('The ShadowGit app did not answer in time, so sessions and saved snapshots may be unavailable.');
     expect(textOf(result)).not.toContain('is not running');
   });
 });

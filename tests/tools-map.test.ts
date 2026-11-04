@@ -40,25 +40,46 @@ describe('get_map', () => {
     expect(text).toContain("webshop's map, drawn from snapshot 9db22aff (2026-10-22T08:46:03+02:00), the newest.");
     expect(text).toContain('19 files, 44 symbols, 3 areas, 33 calls, 13 processes.');
     expect(text).toContain('Layers: api (folder, 7 files), billing (folder, 6 files), jobs (folder, 5 files).');
-    expect(text).toContain('- api (src/api): 8 files, 17 symbols; layers api');
-    expect(text).toContain('- api → billing: 3 calls and imports');
-    expect(text).toContain('- StartServer -> RoundCents: api → billing');
+    expect(text).toContain('- "api" (area src/api): 8 files, 17 symbols; layers api');
+    expect(text).toContain('- "api" → "billing": 3 calls and imports');
+    expect(text).toContain('- StartServer -> RoundCents: "api" → "billing"');
     expect(text).toContain('…and 3 more processes');
+  });
+
+  it("lists each area's id and quotes its label, which names what a slice holds", async () => {
+    const { summary } = MAP_ANSWERS.summary as { summary: object };
+    const areas = [
+      { id: 'src//wiki-*', label: 'src: wiki files', path: 'src', files: 6, symbols: 24, layers: ['src'] },
+      { id: 'src/lib//·', label: 'lib: part0, part1 and 2 more', path: 'src/lib', files: 4, symbols: 16, layers: ['lib'] },
+    ];
+    const links = [{ from: 'src: wiki files', to: 'lib: part0, part1 and 2 more', count: 3 }];
+    app.mapAnswer.map = { ...MAP_ANSWERS.summary, summary: { ...summary, areas: { items: areas, total: 2 }, links: { items: links, total: 1 } } };
+    const result = await getMap({}, 'Claude Code');
+    expect(result.structuredContent).toMatchObject({ summary: { areas: { items: [{ id: 'src//wiki-*' }, { id: 'src/lib//·' }] } } });
+    const text = textOf(result);
+    expect(text).toContain('- "src: wiki files" (area src//wiki-*): 6 files, 24 symbols; layers src');
+    expect(text).toContain('- "src: wiki files" → "lib: part0, part1 and 2 more": 3 calls and imports');
+  });
+
+  it("reads an app's map without ids, each area by its folder", async () => {
+    const result = await getMap({}, 'Claude Code');
+    expect(result.structuredContent).toEqual({ repo: 'webshop', ...MAP_ANSWERS.summary });
+    expect(textOf(result)).toContain('- "api" (area src/api): 8 files, 17 symbols; layers api');
   });
 
   it('gives one area by its label: its files, its symbols most depended on, the areas around it', async () => {
     const text = textOf(await getMap({ area: 'billing' }, 'Claude Code'));
     expect(app.requests.at(-1)?.path).toBe(`/map?${new URLSearchParams({ repoPath: project, area: 'billing', aiTool: 'Claude Code' })}`);
-    expect(text).toContain("The billing area of webshop's map, drawn from snapshot 9db22aff");
+    expect(text).toContain("The \"billing\" area of webshop's map, drawn from snapshot 9db22aff");
     expect(text).toContain('6 files, 15 symbols: src/billing/charge.ts, src/billing/discount.ts');
     expect(text).toContain('Most depended on: roundCents (src/billing/money.ts:1): 4 dependents; chargeCard (src/billing/charge.ts:5): 2 dependents');
-    expect(text).toContain('Depends on no other area. Depended on by api (3) and jobs (3).');
+    expect(text).toContain('Depends on no other area. Depended on by "api" (3) and "jobs" (3).');
   });
 
   it('names an area it does not find, the ones spelled close to it, and how old the map is', async () => {
     app.mapAnswer.area = behind({ ...MAP_ANSWERS.area, area: { kind: 'missing', target: 'bill', near: ['billing'] } });
     const text = textOf(await getMap({ area: 'bill' }, 'Claude Code'));
-    expect(text).toContain('No area or folder "bill" on webshop\'s map. Near: billing.');
+    expect(text).toContain('No area or folder "bill" on webshop\'s map. Near: "billing".');
     // A newer snapshot may hold the area: the answer says the map is behind it
     expect(text).toContain('3 snapshots behind the newest');
   });
@@ -79,10 +100,10 @@ describe('get_code_context', () => {
     expect(result.structuredContent).toEqual({ repo: 'webshop', ...MAP_ANSWERS.context, next: expect.stringMatching(/^Before editing several files: start_session/) });
     const text = textOf(result);
     expect(text).toContain("From webshop's map, drawn from snapshot 9db22aff");
-    expect(text).toContain('chargeCard (function, src/billing/charge.ts:5): area billing, layer billing.');
+    expect(text).toContain('chargeCard (function, src/billing/charge.ts:5): area "billing", layer billing.');
     expect(text).toContain('Uses: recordPayment (src/billing/ledger.ts:3, calls), roundCents (src/billing/money.ts:1, calls).');
-    expect(text).toContain('2 depend on chargeCard, from api (1) and jobs (1): checkout (src/api/checkout.ts:5, calls), retryFailedCharges (src/jobs/retry.ts:5, calls).');
-    expect(text).toContain('Reach within 3 hops: 4 symbols in 5 files (2, 1 and 1 by hop), from api (4) and jobs (1).');
+    expect(text).toContain('2 depend on chargeCard, from "api" (1) and "jobs" (1): checkout (src/api/checkout.ts:5, calls), retryFailedCharges (src/jobs/retry.ts:5, calls).');
+    expect(text).toContain('Reach within 3 hops: 4 symbols in 5 files (2, 1 and 1 by hop), from "api" (4) and "jobs" (1).');
     expect(text).toContain('Processes: StartServer -> RoundCents, StartServer -> RecordPayment');
   });
 
@@ -105,16 +126,16 @@ describe('get_code_context', () => {
   it('says what a file holds, what it imports and what imports it', async () => {
     app.mapAnswer.context = MAP_ANSWERS.file;
     const text = textOf(await getCodeContext({ files: ['src/billing/charge.ts'] }, 'Claude Code'));
-    expect(text).toContain('src/billing/charge.ts: area billing, layer billing. Symbols: chargeCard (function, line 5), refundCard (function, line');
+    expect(text).toContain('src/billing/charge.ts: area "billing", layer billing. Symbols: chargeCard (function, line 5), refundCard (function, line');
     expect(text).toContain('Imports: src/billing/ledger.ts, src/billing/money.ts.');
-    expect(text).toContain('Imported by: src/api/checkout.ts, src/jobs/retry.ts; depended on from api (1) and jobs (1).');
+    expect(text).toContain('Imported by: src/api/checkout.ts, src/jobs/retry.ts; depended on from "api" (1) and "jobs" (1).');
   });
 
   it('says where several targets land together, and what outside them depends on them', async () => {
     app.mapAnswer.context = MAP_ANSWERS.landing;
     const text = textOf(await getCodeContext({ symbols: [{ name: 'chargeCard' }, { name: 'checkout' }] }, 'Claude Code'));
-    expect(text).toContain('Where they land: api (1) and billing (1).');
-    expect(text).toContain('2 depend on them from outside, from api (1) and jobs (1): route (src/api/router.ts:4, calls), retryFailedCharges (src/jobs/retry.ts:5, calls).');
+    expect(text).toContain('Where they land: "api" (1) and "billing" (1).');
+    expect(text).toContain('2 depend on them from outside, from "api" (1) and "jobs" (1): route (src/api/router.ts:4, calls), retryFailedCharges (src/jobs/retry.ts:5, calls).');
   });
 
   it('lists the matches of an ambiguous name and says why a target is not on the map, guessing none', async () => {
@@ -174,7 +195,7 @@ describe('the docs pages on the map', () => {
     const result = await getCodeContext({ files: ['src/billing/charge.ts'] }, 'Claude Code');
     expect(result.structuredContent).toMatchObject({ docs: [{ area: 'src/billing', label: 'billing', summary: SUMMARY }] });
     const text = textOf(result);
-    expect(text).toContain(`\n\nDocs pages of their areas (get_docs reads them):\n- billing (area src/billing): ${SUMMARY}\n\nNext: `);
+    expect(text).toContain(`\n\nDocs pages of their areas (get_docs reads them):\n- "billing" (area src/billing): ${SUMMARY}\n\nNext: `);
     expect(text).not.toMatch(JUDGING);
   });
 

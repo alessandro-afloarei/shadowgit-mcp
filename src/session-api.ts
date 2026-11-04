@@ -27,14 +27,14 @@ export class AppTimeoutError extends Error {
 // 55 s for a map, so its "ask again in a minute" arrives first.
 const SLOW_REQUEST_TIMEOUT_MS = 58_000;
 
-const APP_TOO_OLD = "This version of ShadowGit can't create checkpoints for AI assistants. Ask the user to update the ShadowGit app.";
+const APP_TOO_OLD = "This version of ShadowGit can't save snapshots for AI assistants. Ask the user to update the ShadowGit app.";
 const APP_WITHOUT_LENS = 'This version of ShadowGit has no Lens for AI assistants. Ask the user to update the ShadowGit app.';
 const APP_WITHOUT_MAP = 'This version of ShadowGit has no map for AI assistants. Ask the user to update the ShadowGit app.';
 export const APP_WITHOUT_DOCS = 'This version of ShadowGit has no docs pages for AI assistants. Ask the user to update the ShadowGit app.';
 export const APP_WITHOUT_COMMENTS = 'This version of ShadowGit has no review comments for AI assistants. Ask the user to update the ShadowGit app.';
 // What every app answers a route it doesn't have
 const NO_ROUTE = 'Not found';
-const CHECK_UNREAD = "ShadowGit checked this checkpoint against the project's rules and answered in a shape this version of shadowgit-mcp-server does not read. Ask the user to update shadowgit-mcp-server.";
+const CHECK_UNREAD = "ShadowGit checked this saved snapshot against the project's rules and answered in a shape this version of shadowgit-mcp-server does not read. Ask the user to update shadowgit-mcp-server.";
 const APP_WITHOUT_PIECES = "This version of ShadowGit reads a step's body as plain text only: ask the user to update the ShadowGit app, or send each body as plain text.";
 
 const Session = z.object({
@@ -48,7 +48,7 @@ const Sessions = z.object({ sessions: z.array(Session) });
 // From ShadowGit 0.4.0 the app counts the review comments the person sent that are still open, when there are some
 const StartedSession = z.object({ sessionId: z.string(), openComments: z.number().int().default(0) });
 // From ShadowGit 0.3.13 the app takes a session's unsaved edits into a snapshot as it ends, and answers it
-const EndedSession = z.object({ commit: z.string().optional() });
+const EndedSession = z.object({ commit: z.string().optional(), review: z.string().optional() });
 // The checkpoint is saved whatever shape its check comes in: one this version can't read reads as failed
 const Checkpoint = z.object({
   commit: z.string(),
@@ -69,7 +69,7 @@ const LensDependency = z.object({
   kind: z.string().describe('new, gone, both (each now depends on the other) or count (a dependency that grew or shrank)'),
   from: LensEnd,
   to: LensEnd,
-  evidence: z.array(z.string()).describe('The links the range added or removed that make it, at most 3'),
+  evidence: z.array(z.string()).describe('The links the change added or removed that make it, at most 3'),
   steps: z.array(z.string()).describe('The ids of the steps that hold it'),
 });
 // An app older than linked words sends no quotes and no symbols; one older than the dependency facts sends none
@@ -94,7 +94,7 @@ const LensSkeleton = z.object({
 export const LensRead = z.object({
   range: Range,
   lens: LensSkeleton.nullable(),
-  rules: RuleCheck.nullable().optional().describe("The range checked against the project's rules, also for a range with no lens; null without rules"),
+  rules: RuleCheck.nullable().optional().describe("The change checked against the project's rules, also for a change with no Lens; null without rules"),
   rulesFailure: RulesFailure,
   limits: z.record(z.string(), z.number()),
 });
@@ -120,6 +120,7 @@ export interface LensWords {
 }
 
 export type ActiveSession = z.infer<typeof Session>;
+export type SessionEnd = z.infer<typeof EndedSession>;
 
 const baseUrl = () => process.env.SHADOWGIT_SESSION_API ?? 'http://localhost:45289/api';
 
@@ -178,7 +179,7 @@ async function request(
 }
 
 /** An answer in the shape this version reads: one of another shape asks for a server update, not a parse error. */
-function read<S extends z.ZodType>(shape: S, json: unknown, what: 'map' | 'lens' | 'session' | 'checkpoint' | 'docs page' | 'review comment'): z.infer<S> {
+function read<S extends z.ZodType>(shape: S, json: unknown, what: 'map' | 'lens' | 'session' | 'saved snapshot' | 'docs page' | 'review comment'): z.infer<S> {
   const parsed = shape.safeParse(json);
   if (!parsed.success) throw new Error(`ShadowGit answered with a ${what} this version of shadowgit-mcp-server does not read. Ask the user to update shadowgit-mcp-server.`, { cause: parsed.error });
   return parsed.data;
@@ -200,11 +201,14 @@ export async function startSession(repoPath: string, description: string, aiTool
   return read(StartedSession, json, 'session');
 }
 
-/** The snapshot the session ended at, holding the edits it never checkpointed; undefined from an app before 0.3.13. */
-export async function endSession(sessionId: string): Promise<string | undefined> {
-  // The app commits the unsaved edits inside this request, as for a checkpoint
+/**
+ * The snapshot the session ended at, holding the edits it never saved (none from an app before 0.3.13), and where the
+ * person reviews it, in the app's words (none from an app 0.4.0 or older, or for a session that holds no snapshot).
+ */
+export async function endSession(sessionId: string): Promise<SessionEnd> {
+  // The app saves the unsaved edits inside this request, as `checkpoint` does
   const { json } = await request('/session/end', { sessionId }, { timeoutMs: SLOW_REQUEST_TIMEOUT_MS });
-  return read(EndedSession, json, 'session').commit;
+  return read(EndedSession, json, 'session');
 }
 
 export async function createCheckpoint(input: {
@@ -217,13 +221,13 @@ export async function createCheckpoint(input: {
   const { status, json } = await request('/checkpoint', input, { timeoutMs: SLOW_REQUEST_TIMEOUT_MS, accept: [409], missing: APP_TOO_OLD }).catch((error: unknown) => {
     if (!(error instanceof AppTimeoutError)) throw error;
     throw new Error(
-      `ShadowGit did not answer within ${SLOW_REQUEST_TIMEOUT_MS / 1_000} s; the checkpoint may still be saving. Check with git_command (log -1) before trying again.`,
+      `ShadowGit did not answer within ${SLOW_REQUEST_TIMEOUT_MS / 1_000} s; the snapshot may still be saving. Check with git_command (log -1) before trying again.`,
       { cause: error },
     );
   });
   // Nothing new: an automatic snapshot may have taken the change first, and from 0.3.13 the app checks that snapshot
-  if (status === 409) return { commit: null, filesChanged: 0, ...read(Checkpoint.pick({ rules: true }), json, 'checkpoint') };
-  return read(Checkpoint, json, 'checkpoint');
+  if (status === 409) return { commit: null, filesChanged: 0, ...read(Checkpoint.pick({ rules: true }), json, 'saved snapshot') };
+  return read(Checkpoint, json, 'saved snapshot');
 }
 
 /** The lens of a range for the agent to word: the latest AI session's without a head. The app may draw it inside the request. */

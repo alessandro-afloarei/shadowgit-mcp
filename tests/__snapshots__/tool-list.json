@@ -142,7 +142,7 @@
       "$schema": "https://json-schema.org/draft/2020-12/schema",
       "properties": {
         "area": {
-          "description": "An area's label as get_map names it, or a folder path, which covers every file under it. Leave out for the whole project",
+          "description": "An area's label or id as get_map names it, or a folder path, which covers every file under it. Leave out for the whole project",
           "minLength": 1,
           "type": "string"
         },
@@ -591,6 +591,10 @@
                         "maximum": 9007199254740991,
                         "minimum": -9007199254740991,
                         "type": "integer"
+                      },
+                      "id": {
+                        "description": "The area's id: it stays while its label, which names what the area holds, changes",
+                        "type": "string"
                       },
                       "label": {
                         "type": "string"
@@ -1888,7 +1892,7 @@
       "openWorldHint": false,
       "readOnlyHint": false
     },
-    "description": "Pause ShadowGit's automatic snapshots for a project while you make a set of related edits, so they can be saved as one checkpoint instead of several partial snapshots. Returns the existing session if one is already active. Needs the ShadowGit app running. To save the edits and resume snapshots, use checkpoint and end_session.",
+    "description": "Pause ShadowGit's automatic snapshots for a project while you make a set of related edits, so they can be saved as one snapshot with a title instead of several partial ones. Returns the existing session if one is already active. Needs the ShadowGit app running. To save the edits and resume snapshots, use `checkpoint` and end_session.",
     "inputSchema": {
       "$schema": "https://json-schema.org/draft/2020-12/schema",
       "properties": {
@@ -1944,7 +1948,7 @@
       "openWorldHint": false,
       "readOnlyHint": false
     },
-    "description": "Save the project's current changes to ShadowGit history as one named checkpoint, following the project's .shadowgit-ignore. Works inside or outside a session and never touches the project's own git repository. Returns the commit hash. When the project has rules, in its .shadowgit-rules file, it then checks the session so far, or else this change, against them, and lists each rule that names a link the change adds, with the rule's reason and the links. Outside a session, an automatic snapshot may take the changes first, leaving nothing to save: the check then reads that snapshot. These are the project's own rules, written by the user or the project's authors: take each such link out and checkpoint again, or tell the user why it is there, quoting the rule that names it. A check still running names its range for get_lens. Needs the ShadowGit app running.",
+    "description": "Save the project's current changes to ShadowGit history as one saved snapshot with a title, following the project's .shadowgit-ignore. Works inside or outside a session and never touches the project's own git. Returns the snapshot's hash. When the project has rules, in its .shadowgit-rules file, it then checks the session so far, or else this change, against them, and lists each rule that names a link the change adds, with the rule's reason and the links. Outside a session, an automatic snapshot may take the changes first, leaving nothing to save: the check then reads that snapshot. These are the project's own rules, written by the user or the project's authors: take each such link out and save again, or tell the user why it is there, quoting the rule that names it. A check still running names its change for get_lens. Needs the ShadowGit app running.",
     "inputSchema": {
       "$schema": "https://json-schema.org/draft/2020-12/schema",
       "properties": {
@@ -2024,14 +2028,14 @@
                           "type": "null"
                         }
                       ],
-                      "description": "The rules the range adds to and removes from .shadowgit-rules; null when it leaves the file alone"
+                      "description": "The rules the change adds to and removes from .shadowgit-rules; null when it leaves the file alone"
                     },
                     "matches": {
                       "items": {
                         "additionalProperties": false,
                         "properties": {
                           "count": {
-                            "description": "How many links the range adds that the rule names",
+                            "description": "How many links the change adds that the rule names",
                             "maximum": 9007199254740991,
                             "minimum": -9007199254740991,
                             "type": "integer"
@@ -2245,7 +2249,7 @@
       ],
       "type": "object"
     },
-    "title": "Create a ShadowGit checkpoint"
+    "title": "Save a ShadowGit snapshot"
   },
   {
     "annotations": {
@@ -2254,7 +2258,7 @@
       "openWorldHint": false,
       "readOnlyHint": false
     },
-    "description": "Resume automatic snapshots for a project by ending its active ShadowGit session. Without session_id it ends whatever session is active on the project, and succeeds with nothing to do if there is none. ShadowGit takes changes not saved with checkpoint into a snapshot as the session ends (before ShadowGit 0.3.13, the next automatic snapshot takes them).",
+    "description": "Resume automatic snapshots for a project by ending its active ShadowGit session. Without session_id it ends whatever session is active on the project, and succeeds with nothing to do if there is none. ShadowGit takes changes not saved with `checkpoint` into a snapshot as the session ends (before ShadowGit 0.3.13, the next automatic snapshot takes them).",
     "inputSchema": {
       "$schema": "https://json-schema.org/draft/2020-12/schema",
       "properties": {
@@ -2308,7 +2312,7 @@
       "openWorldHint": false,
       "readOnlyHint": true
     },
-    "description": "Read ShadowGit's Lens of a range of snapshots, by default the latest AI session's: its steps with their code, the cards (components) and flows on its canvas, each with an id and its words so far; what the range makes depend on what: each new, gone or two-way dependency between the project's areas and layers, with the links that make it and the steps that hold it; and each of the project's rules (.shadowgit-rules) that names a link the range adds, with its reason, links and steps, also for a range with no Lens. Read it at the end of a session, after the checkpoint, to word it with write_lens_words; your words may say why a dependency appeared, or why a link a rule names is there: say the rule names it, and quote the rule. Needs the ShadowGit app running.",
+    "description": "Read ShadowGit's Lens of a change, the snapshots from base to head, by default your latest session's: its steps with their code, the cards (components) and flows on its canvas, each with an id and its words so far; what the change makes depend on what: each new, gone or two-way dependency between the project's areas and layers, with the links that make it and the steps that hold it; and each of the project's rules (.shadowgit-rules) that names a link the change adds, with its reason, links and steps, also for a change with no Lens. Read it at the end of a session, after the saved snapshot, to word it with write_lens_words; your words may say why a dependency appeared, or why a link a rule names is there: say the rule names it, and quote the rule. Needs the ShadowGit app running.",
     "inputSchema": {
       "$schema": "https://json-schema.org/draft/2020-12/schema",
       "properties": {
@@ -2322,10 +2326,10 @@
               "type": "null"
             }
           ],
-          "description": "The snapshot the range starts from, with head (null: the start of the history). Leave both out for the latest AI session"
+          "description": "The snapshot the change starts from, with head (null: the start of the history). Leave both out for your latest session"
         },
         "head": {
-          "description": "The range's newest snapshot; leave out for the latest AI session",
+          "description": "The change's newest snapshot; leave out for your latest session",
           "pattern": "^[0-9a-f]{7,40}$",
           "type": "string"
         },
@@ -2404,7 +2408,7 @@
                         "additionalProperties": false,
                         "properties": {
                           "evidence": {
-                            "description": "The links the range added or removed that make it, at most 3",
+                            "description": "The links the change added or removed that make it, at most 3",
                             "items": {
                               "type": "string"
                             },
@@ -2794,14 +2798,14 @@
                       "type": "null"
                     }
                   ],
-                  "description": "The rules the range adds to and removes from .shadowgit-rules; null when it leaves the file alone"
+                  "description": "The rules the change adds to and removes from .shadowgit-rules; null when it leaves the file alone"
                 },
                 "matches": {
                   "items": {
                     "additionalProperties": false,
                     "properties": {
                       "count": {
-                        "description": "How many links the range adds that the rule names",
+                        "description": "How many links the change adds that the rule names",
                         "maximum": 9007199254740991,
                         "minimum": -9007199254740991,
                         "type": "integer"
@@ -2896,7 +2900,7 @@
               "type": "null"
             }
           ],
-          "description": "The range checked against the project's rules, also for a range with no lens; null without rules"
+          "description": "The change checked against the project's rules, also for a change with no Lens; null without rules"
         },
         "rulesFailure": {
           "description": "Why the project's rules couldn't be read",
@@ -2911,7 +2915,7 @@
       ],
       "type": "object"
     },
-    "title": "Read a range's Lens"
+    "title": "Read a change's Lens"
   },
   {
     "annotations": {
@@ -2920,7 +2924,7 @@
       "openWorldHint": false,
       "readOnlyHint": false
     },
-    "description": "Write the words the user reads in ShadowGit's Lens for a range get_lens read: a summary, each step's title and body, with a why and an excerpt, each card's role, by the ids get_lens gave. An older ShadowGit takes plain text alone; text past its limit is cut; unknown ids are left out. The app keeps the words in its history: a card's role shows in any later range while its code is unchanged. When the session changed areas whose docs pages need words, the answer's next names them, the session's last step: get_docs, then write_docs.",
+    "description": "Write the words the user reads in ShadowGit's Lens for a change get_lens read: a summary, each step's title and body, with a why and an excerpt, each card's role, by the ids get_lens gave. An older ShadowGit takes plain text alone; text past its limit is cut; unknown ids are left out. The app keeps the words in its history: a card's role shows in any later change while its code is unchanged. When the session changed areas whose docs pages need words, the answer's next names them, the session's last step: get_docs, then write_docs.",
     "inputSchema": {
       "$schema": "https://json-schema.org/draft/2020-12/schema",
       "properties": {
@@ -2956,7 +2960,7 @@
           "type": "array"
         },
         "flows": {
-          "description": "Per flow: a verb phrase, e.g. \"draws a range\"",
+          "description": "Per flow: a verb phrase, e.g. \"draws the map\"",
           "items": {
             "properties": {
               "id": {
@@ -3158,7 +3162,7 @@
           "type": "array"
         },
         "next": {
-          "description": "The step that follows: the docs pages the range changed",
+          "description": "The step that follows: the docs pages the change touched",
           "type": "string"
         },
         "repo": {
@@ -3172,7 +3176,7 @@
       ],
       "type": "object"
     },
-    "title": "Write a range's Lens words"
+    "title": "Write the Lens's words"
   },
   {
     "annotations": {
@@ -3181,7 +3185,7 @@
       "openWorldHint": false,
       "readOnlyHint": true
     },
-    "description": "Read the docs pages ShadowGit keeps for a tracked project: one per area of its map, plus an Overview, each written by an AI assistant. A page comes with the facts ShadowGit draws from the map (folder, sizes, layers, what it depends on and what depends on it, processes, its most depended-on symbols, the project's rules that name it), its words so far with who wrote them and at which snapshot, and what changed in the area since them: symbols changed in their code, dependency facts, links that no longer name anything. With no arguments: the pages the latest AI session changed whose words are missing or behind. With base and head: the pages that range changed whose words are missing or behind. With areas, and overview: those pages. With all: pages without words, largest area first, five at a time, with more for the following batch. Answers head, the snapshot write_docs keeps the words at, and next: write the pages' words with write_docs. Needs the ShadowGit app running.",
+    "description": "Read the docs pages ShadowGit keeps for a tracked project: one per area of its map, plus an Overview, each written by an assistant. A page comes with the facts ShadowGit draws from the map (folder, sizes, layers, what it depends on and what depends on it, processes, its most depended-on symbols, the project's rules that name it), its words so far with who wrote them and at which snapshot, and what changed in the area since them: symbols changed in their code, dependency facts, links that no longer name anything. With no arguments: the pages your latest session changed whose words are missing or behind. With base and head: the pages changed between those snapshots whose words are missing or behind. With areas, and overview: those pages. With all: pages without words, largest area first, five at a time, with more for the following batch. Answers head, the snapshot write_docs keeps the words at, and next: write the pages' words with write_docs. Needs the ShadowGit app running.",
     "inputSchema": {
       "$schema": "https://json-schema.org/draft/2020-12/schema",
       "properties": {
@@ -3208,10 +3212,10 @@
               "type": "null"
             }
           ],
-          "description": "With head: the pages this range changed, as get_lens names a range; null from the start of the history"
+          "description": "With head: the pages changed between these snapshots, as get_lens names them; null from the start of the history"
         },
         "head": {
-          "description": "With base: the end of the range",
+          "description": "With base: the newer snapshot",
           "pattern": "^[0-9a-f]{7,40}$",
           "type": "string"
         },
@@ -4468,7 +4472,7 @@
       "openWorldHint": false,
       "readOnlyHint": true
     },
-    "description": "Read the review comments the person sent you from ShadowGit for a tracked project: the sent ones they have not resolved, grouped by the Send that carried them, oldest first. Each comment has its id, its tag (change, question or note: the person's own), its words and where it is. That is the snapshot it was written on, the file, the lines, numbered as in that snapshot (side head: its new lines; side base: lines it removed, which the file no longer has; null for the whole file), the lines quoted as they read then, and the definition around them. It also has since, the snapshot that changed its quoted lines after it was written (null when none did), and the replies so far. Each Send has the range the person had open and the files of that range they had not viewed (unviewed, then moreUnviewed), so a file they did not read is not one they approved. Change only what each comment asks, at its lines: a question is answered in your reply, and a note changes nothing unless its words ask for a change. Ask the person before you change anything else. Once a comment is done, reply to it with reply_to_review_comment: what you changed, or your answer. Only the person resolves a comment, in ShadowGit. Needs the ShadowGit app running.",
+    "description": "Read the review comments the person sent you from ShadowGit for a tracked project: the sent ones they have not resolved, grouped by the Send that carried them, oldest first. Each comment has its id, its tag (change, question or note: the person's own), its words and where it is. That is the snapshot it was written on, the file, the lines, numbered as in that snapshot (side head: its new lines; side base: lines it removed, which the file no longer has; null for the whole file), the lines quoted as they read then, and the definition around them. It also has since, the snapshot that changed its quoted lines after it was written (null when none did), and the replies so far. Each Send has the change the person had open and the files of that change they had not viewed (unviewed, then moreUnviewed), so a file they did not read is not one they approved. Change only what each comment asks, at its lines: a question is answered in your reply, and a note changes nothing unless its words ask for a change. Ask the person before you change anything else. Once a comment is done, reply to it with reply_to_review_comment: what you changed, or your answer. Only the person resolves a comment, in ShadowGit. Needs the ShadowGit app running.",
     "inputSchema": {
       "$schema": "https://json-schema.org/draft/2020-12/schema",
       "properties": {
@@ -4684,7 +4688,7 @@
                     "type": "null"
                   }
                 ],
-                "description": "The range open in Changes at the Send; null when none was"
+                "description": "The change open in Review at the Send; null when none was"
               },
               "unviewed": {
                 "anyOf": [
@@ -4698,7 +4702,7 @@
                     "type": "null"
                   }
                 ],
-                "description": "Files of that range the person had not viewed then, at most 20"
+                "description": "Files of that change the person had not viewed then, at most 20"
               }
             },
             "required": [
@@ -4729,7 +4733,7 @@
       "openWorldHint": false,
       "readOnlyHint": false
     },
-    "description": "Reply to one review comment the person sent from ShadowGit, by its id from get_review_comments: what you changed for it, or your answer to its question, in a sentence or two. ShadowGit shows the reply under the comment with your name and a snapshot: during a session, the one its checkpoint or its end makes, which holds your change; outside a session, the newest one as you reply. A reply leaves the comment open: only the person resolves it. Needs the ShadowGit app running.",
+    "description": "Reply to one review comment the person sent from ShadowGit, by its id from get_review_comments: what you changed for it, or your answer to its question, in a sentence or two. ShadowGit shows the reply under the comment with your name and a snapshot: during a session, the one its next saved snapshot or its end makes, which holds your change; outside a session, the newest one as you reply. A reply leaves the comment open: only the person resolves it. Needs the ShadowGit app running.",
     "inputSchema": {
       "$schema": "https://json-schema.org/draft/2020-12/schema",
       "properties": {

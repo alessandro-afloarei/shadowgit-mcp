@@ -4,7 +4,7 @@ import { asClient } from '../client-name.js';
 import { DocPiece, DocsCursor, DocsRead, DocsWritten, type DocKey, type DocWords } from '../doc-shapes.js';
 import { resolveRepo } from '../repos.js';
 import { readDocs, sendDocs, type AppDocWrite } from '../session-api.js';
-import { drawnFrom } from './map.js';
+import { areaName, drawnFrom } from './map.js';
 import { quote } from './rules.js';
 import { andList, dataResult, forProject, list, plural, repoParam, Snapshot } from './shared.js';
 
@@ -25,7 +25,7 @@ type Words = z.infer<typeof DocWords>;
 
 const BOTH = 'Ask for all, or name areas and the overview: not both.';
 const HALF_RANGE = 'Pass base and head together.';
-const ONE_ASK = 'Ask for a range, name areas, or ask for all: one of them.';
+const ONE_ASK = 'Ask for a change with base and head, name areas, or ask for all: one of them.';
 
 /** A page as the answers name it: the Overview, or an area by its id. */
 export const pageName = (key: z.infer<typeof DocKey>) => ('area' in key ? key.area : 'the Overview');
@@ -59,7 +59,7 @@ function stateLine({ state, words, changes, countFailure }: Page): string {
 }
 
 function factLines(facts: Facts): string[] {
-  const links = (each: readonly { label: string; count: number }[]) => (each.length === 0 ? 'none' : each.map(({ label, count }) => `${label} (${count})`).join(', '));
+  const links = (each: readonly { label: string; count: number }[]) => (each.length === 0 ? 'none' : each.map(({ label, count }) => `${quote(label)} (${count})`).join(', '));
   if ('folder' in facts) {
     return [
       `  Facts: folder ${facts.folder}; ${plural(facts.files, 'file')}, ${plural(facts.symbols, 'symbol')}; layers ${facts.layers.join(', ') || 'none'}.`,
@@ -74,9 +74,9 @@ function factLines(facts: Facts): string[] {
   return [
     `  Facts: ${plural(files, 'file')}, ${plural(symbols, 'symbol')}, ${plural(areas, 'area')}, ${plural(calls, 'call')}, ${plural(processes, 'process')}.`,
     `  Layers: ${facts.layers.map((layer) => `${layer.name} (${layer.kind}, ${plural(layer.files, 'file')})`).join(', ')}.`,
-    `  Areas: ${list(facts.areas, (area) => `${area.label} (area ${area.id}): ${plural(area.files, 'file')}, ${plural(area.symbols, 'symbol')}`, '; ')}.`,
-    ...(facts.links.total > 0 ? [`  Links between areas: ${list(facts.links, ({ from, to, count }) => `${from.label} → ${to.label} (${count})`)}.`] : []),
-    ...(facts.processes.total > 0 ? [`  Processes: ${list(facts.processes, ({ label, areas: through }) => `${label} (${through.join(' → ')})`, '; ')}.`] : []),
+    `  Areas: ${list(facts.areas, (area) => `${areaName(area.label, area.id)}: ${plural(area.files, 'file')}, ${plural(area.symbols, 'symbol')}`, '; ')}.`,
+    ...(facts.links.total > 0 ? [`  Links between areas: ${list(facts.links, ({ from, to, count }) => `${quote(from.label)} → ${quote(to.label)} (${count})`)}.`] : []),
+    ...(facts.processes.total > 0 ? [`  Processes: ${list(facts.processes, ({ label, areas: through }) => `${label} (${through.map(quote).join(' → ')})`, '; ')}.`] : []),
   ];
 }
 
@@ -159,10 +159,10 @@ export async function getDocs({
   const step = written === undefined ? undefined : `${forProject(repo, project)}${written}`;
   const { next: cursor, ...rest } = read;
   const none = ranged
-    ? `The range changed no area of ${project.name} whose docs page needs words.`
+    ? `That change touched no area of ${project.name} whose docs page needs words.`
     : batch
       ? `Every page of ${project.name}'s map has words.`
-      : `The latest AI session in ${project.name} changed no area whose docs page needs words.`;
+      : `Your latest session in ${project.name} changed no area whose docs page needs words.`;
   return dataResult(DocsOutput, describeDocs(project.name, read, none, step), { repo: project.name, ...rest, more: cursor, ...(step !== undefined && { next: step }) });
 }
 
@@ -224,10 +224,10 @@ export function registerDocs(server: McpServer): void {
     {
       title: 'Read docs pages',
       description:
-        "Read the docs pages ShadowGit keeps for a tracked project: one per area of its map, plus an Overview, each written by an AI assistant. A page comes with the facts ShadowGit draws from the map (folder, sizes, layers, what it depends on and what depends on it, processes, its most depended-on symbols, the project's rules that name it), its words so far with who wrote them and at which snapshot, and what changed in the area since them: symbols changed in their code, dependency facts, links that no longer name anything. With no arguments: the pages the latest AI session changed whose words are missing or behind. With base and head: the pages that range changed whose words are missing or behind. With areas, and overview: those pages. With all: pages without words, largest area first, five at a time, with more for the following batch. Answers head, the snapshot write_docs keeps the words at, and next: write the pages' words with write_docs. Needs the ShadowGit app running.",
+        "Read the docs pages ShadowGit keeps for a tracked project: one per area of its map, plus an Overview, each written by an assistant. A page comes with the facts ShadowGit draws from the map (folder, sizes, layers, what it depends on and what depends on it, processes, its most depended-on symbols, the project's rules that name it), its words so far with who wrote them and at which snapshot, and what changed in the area since them: symbols changed in their code, dependency facts, links that no longer name anything. With no arguments: the pages your latest session changed whose words are missing or behind. With base and head: the pages changed between those snapshots whose words are missing or behind. With areas, and overview: those pages. With all: pages without words, largest area first, five at a time, with more for the following batch. Answers head, the snapshot write_docs keeps the words at, and next: write the pages' words with write_docs. Needs the ShadowGit app running.",
       inputSchema: z.object({
-        base: Snapshot.nullable().optional().describe('With head: the pages this range changed, as get_lens names a range; null from the start of the history'),
-        head: Snapshot.optional().describe('With base: the end of the range'),
+        base: Snapshot.nullable().optional().describe('With head: the pages changed between these snapshots, as get_lens names them; null from the start of the history'),
+        head: Snapshot.optional().describe('With base: the newer snapshot'),
         areas: z.array(z.string().min(1)).max(20).optional().describe("Area ids, as get_docs names them: most are the area's folder, as get_map lists it"),
         overview: z.boolean().optional().describe('The Overview page, alone or with areas'),
         all: z.boolean().optional().describe('Pages without words, five at a time'),

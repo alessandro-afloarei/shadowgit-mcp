@@ -44,7 +44,7 @@ function commentLines(comment: Comment): string[] {
 }
 
 function sendLines(send: Send): string[] {
-  const range = send.range === null ? 'with no range open' : `reading ${send.range.label} (${snapshots(send.range)})`;
+  const range = send.range === null ? 'with no change open' : `reading ${send.range.label} (${snapshots(send.range)})`;
   const unviewed = send.unviewed ?? [];
   return [
     `Send ${send.id}, ${range}:`,
@@ -73,7 +73,7 @@ export async function getReviewComments({ repo }: { repo?: string }): Promise<Ca
 export async function replyToReviewComment({ id, text, repo }: { id: number; text: string; repo?: string }, author: string): Promise<CallToolResult> {
   const project = resolveRepo(repo);
   const reply = await replyToComment({ repoPath: project.path, id, text, author });
-  const where = reply.snapshot === null ? "; it names the snapshot of this session's checkpoint or end." : `, at snapshot ${short(reply.snapshot)}.`;
+  const where = reply.snapshot === null ? "; it names the snapshot this session saves next or ends at." : `, at snapshot ${short(reply.snapshot)}.`;
   return dataResult(ReplyOutput, `Your reply is under comment #${id} in ShadowGit${where}`, { repo: project.name, id, reply });
 }
 
@@ -83,7 +83,7 @@ export function registerComments(server: McpServer): void {
     {
       title: 'Read the review comments',
       description:
-        "Read the review comments the person sent you from ShadowGit for a tracked project: the sent ones they have not resolved, grouped by the Send that carried them, oldest first. Each comment has its id, its tag (change, question or note: the person's own), its words and where it is. That is the snapshot it was written on, the file, the lines, numbered as in that snapshot (side head: its new lines; side base: lines it removed, which the file no longer has; null for the whole file), the lines quoted as they read then, and the definition around them. It also has since, the snapshot that changed its quoted lines after it was written (null when none did), and the replies so far. Each Send has the range the person had open and the files of that range they had not viewed (unviewed, then moreUnviewed), so a file they did not read is not one they approved. Change only what each comment asks, at its lines: a question is answered in your reply, and a note changes nothing unless its words ask for a change. Ask the person before you change anything else. Once a comment is done, reply to it with reply_to_review_comment: what you changed, or your answer. Only the person resolves a comment, in ShadowGit. Needs the ShadowGit app running.",
+        "Read the review comments the person sent you from ShadowGit for a tracked project: the sent ones they have not resolved, grouped by the Send that carried them, oldest first. Each comment has its id, its tag (change, question or note: the person's own), its words and where it is. That is the snapshot it was written on, the file, the lines, numbered as in that snapshot (side head: its new lines; side base: lines it removed, which the file no longer has; null for the whole file), the lines quoted as they read then, and the definition around them. It also has since, the snapshot that changed its quoted lines after it was written (null when none did), and the replies so far. Each Send has the change the person had open and the files of that change they had not viewed (unviewed, then moreUnviewed), so a file they did not read is not one they approved. Change only what each comment asks, at its lines: a question is answered in your reply, and a note changes nothing unless its words ask for a change. Ask the person before you change anything else. Once a comment is done, reply to it with reply_to_review_comment: what you changed, or your answer. Only the person resolves a comment, in ShadowGit. Needs the ShadowGit app running.",
       inputSchema: z.object({ repo: repoParam }),
       outputSchema: CommentsOutput,
       annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
@@ -95,7 +95,7 @@ export function registerComments(server: McpServer): void {
     {
       title: 'Reply to a review comment',
       description:
-        'Reply to one review comment the person sent from ShadowGit, by its id from get_review_comments: what you changed for it, or your answer to its question, in a sentence or two. ShadowGit shows the reply under the comment with your name and a snapshot: during a session, the one its checkpoint or its end makes, which holds your change; outside a session, the newest one as you reply. A reply leaves the comment open: only the person resolves it. Needs the ShadowGit app running.',
+        'Reply to one review comment the person sent from ShadowGit, by its id from get_review_comments: what you changed for it, or your answer to its question, in a sentence or two. ShadowGit shows the reply under the comment with your name and a snapshot: during a session, the one its next saved snapshot or its end makes, which holds your change; outside a session, the newest one as you reply. A reply leaves the comment open: only the person resolves it. Needs the ShadowGit app running.',
       inputSchema: z.object({
         id: z.number().int().positive().describe("The comment's id, as get_review_comments gives it"),
         text: z.string().trim().min(1).max(REPLY_MAX).describe(`What you changed for it, or your answer: at most ${REPLY_MAX.toLocaleString('en-US')} characters`),
