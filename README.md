@@ -61,7 +61,7 @@ webshop") when ShadowGit tracks more than one.
 | `get_code_context` | Gives where files and symbols sit, what depends on them, where a change to them lands, the project's rules for them and their areas' docs pages' summaries |
 | `start_session` | Pauses automatic snapshots while the assistant edits |
 | `checkpoint` | Saves the current changes as one snapshot with a title, following `.shadowgit-ignore`, then checks it against the project's `.shadowgit-rules` |
-| `end_session` | Resumes automatic snapshots |
+| `end_session` | Resumes automatic snapshots, and tells your assistant where you review the session in ShadowGit |
 | `get_lens` | Reads ShadowGit's Lens of a change, by default your latest session, with what it makes depend on what and the links a rule names |
 | `write_lens_words` | Writes the Lens's words for that change, kept in the history, with links, a why and an excerpt |
 | `get_docs` | Reads the project's docs pages, one per map area plus an Overview: by default those your latest session changed that need words, each with its facts, its words so far and what changed since them |

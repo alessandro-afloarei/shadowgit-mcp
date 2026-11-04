@@ -48,7 +48,7 @@ const Sessions = z.object({ sessions: z.array(Session) });
 // From ShadowGit 0.4.0 the app counts the review comments the person sent that are still open, when there are some
 const StartedSession = z.object({ sessionId: z.string(), openComments: z.number().int().default(0) });
 // From ShadowGit 0.3.13 the app takes a session's unsaved edits into a snapshot as it ends, and answers it
-const EndedSession = z.object({ commit: z.string().optional() });
+const EndedSession = z.object({ commit: z.string().optional(), review: z.string().optional() });
 // The checkpoint is saved whatever shape its check comes in: one this version can't read reads as failed
 const Checkpoint = z.object({
   commit: z.string(),
@@ -200,11 +200,14 @@ export async function startSession(repoPath: string, description: string, aiTool
   return read(StartedSession, json, 'session');
 }
 
-/** The snapshot the session ended at, holding the edits it never checkpointed; undefined from an app before 0.3.13. */
-export async function endSession(sessionId: string): Promise<string | undefined> {
-  // The app commits the unsaved edits inside this request, as for a checkpoint
+/**
+ * The snapshot the session ended at, holding the edits it never saved (none from an app before 0.3.13), and where the
+ * person reviews it, in the app's words (none from an app 0.4.0 or older, or for a session that holds no snapshot).
+ */
+export async function endSession(sessionId: string): Promise<z.infer<typeof EndedSession>> {
+  // The app saves the unsaved edits inside this request, as `checkpoint` does
   const { json } = await request('/session/end', { sessionId }, { timeoutMs: SLOW_REQUEST_TIMEOUT_MS });
-  return read(EndedSession, json, 'session').commit;
+  return read(EndedSession, json, 'session');
 }
 
 export async function createCheckpoint(input: {

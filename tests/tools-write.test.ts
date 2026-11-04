@@ -30,6 +30,7 @@ beforeEach(() => {
   app.sessions.length = 0;
   app.checkpointStatus = 200;
   app.endCommit = null;
+  app.endReview = null;
   app.commentsAnswer = { sends: [] };
 });
 
@@ -159,6 +160,23 @@ describe('end_session', () => {
     expect(result.structuredContent).toEqual({ ended: ['claude-code-8'], repo: 'webshop', next: expect.stringMatching(/^get_lens, then write_lens_words/) });
     expect(textOf(result)).toContain('Ended claude-code-8 on webshop at snapshot ffffffff, which holds its edits. Automatic snapshots resumed.');
     expect(textOf(result)).not.toContain('save them with `checkpoint` first');
+  });
+
+  it('relays where the app reviews a session', async () => {
+    app.endCommit = 'f'.repeat(40);
+    app.endReview = 'Open webshop in ShadowGit, then Review session.';
+    app.sessions.push(fakeSession({ id: 'claude-code-9', repoPath: project }));
+    const result = await endSession({});
+    expect(result.structuredContent).toMatchObject({ next: expect.stringMatching(/ Then tell the user: Open webshop in ShadowGit, then Review session\.$/) });
+    expect(textOf(result)).toMatch(/ Then tell the user: Open webshop in ShadowGit, then Review session\.$/);
+  });
+
+  it("says nothing of Review for an app that doesn't", async () => {
+    app.endCommit = 'f'.repeat(40);
+    app.sessions.push(fakeSession({ id: 'claude-code-10', repoPath: project }));
+    const result = await endSession({});
+    expect(textOf(result)).not.toContain('Review session');
+    expect(result.structuredContent).toMatchObject({ next: expect.stringMatching(/in your words\.$/) });
   });
 
   it('succeeds with nothing to do when no session is active', async () => {
