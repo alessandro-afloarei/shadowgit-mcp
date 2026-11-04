@@ -52,6 +52,7 @@ const CASES: { phrase: string; prepare?: (app: FakeApp, project: string) => void
   },
   { phrase: 'What changed in webshop in the last hour?', passed: ({ answer }) => answer.includes('checkout.ts') },
   { phrase: 'Show me the last 10 commits in webshop', passed: ({ answer }) => answer.includes('Add checkout page') },
+  { phrase: 'Show me the last 10 snapshots in webshop', passed: ({ answer }) => answer.includes('Add checkout page') },
   {
     phrase: 'Start a ShadowGit session for debugging',
     passed: ({ app, project }) => app.requestsTo('/session/start').some((b) => b.repoPath === project),
