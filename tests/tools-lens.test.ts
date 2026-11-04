@@ -66,6 +66,11 @@ describe('get_lens', () => {
     expect(text).toContain(`base null and head "${FAKE_RANGE.head}"`);
   });
 
+  it("says whose words the Lens holds in the person's words: an assistant's, never the app's \"agent\"", async () => {
+    app.lensAnswer = { range: FAKE_RANGE, lens: { ...FAKE_LENS, words: { source: 'agent', author: 'Claude Code' } } };
+    expect(textOf(await getLens({}))).toContain("its words now: an assistant's (Claude Code).");
+  });
+
   it("lists each step's symbols with their lines and the range's checkpoint quotes", async () => {
     app.lensAnswer = { range: FAKE_RANGE, lens: FAKE_CITED_LENS };
     const text = textOf(await getLens({}));

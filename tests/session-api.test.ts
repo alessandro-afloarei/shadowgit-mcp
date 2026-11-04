@@ -123,7 +123,7 @@ describe('an answer of a shape this version does not read', () => {
     };
     await expect(activeSessions()).rejects.toThrow(update('session'));
     await expect(startSession('/projects/webshop', 'Fix login', 'Claude Code')).rejects.toThrow(update('session'));
-    await expect(createCheckpoint(checkpointInput)).rejects.toThrow(update('checkpoint'));
+    await expect(createCheckpoint(checkpointInput)).rejects.toThrow(update('saved snapshot'));
     await expect(readLens({ repoPath: '/projects/webshop' })).rejects.toThrow(update('lens'));
     await expect(sendLensWords({ repoPath: '/projects/webshop', base: null, head: FAKE_RANGE.head, author: 'Claude Code', words: {} })).rejects.toThrow(update('lens'));
     await expect(readDocs({ repoPath: '/projects/webshop' })).rejects.toThrow(update('docs page'));

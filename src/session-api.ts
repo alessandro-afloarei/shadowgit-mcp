@@ -178,7 +178,7 @@ async function request(
 }
 
 /** An answer in the shape this version reads: one of another shape asks for a server update, not a parse error. */
-function read<S extends z.ZodType>(shape: S, json: unknown, what: 'map' | 'lens' | 'session' | 'checkpoint' | 'docs page' | 'review comment'): z.infer<S> {
+function read<S extends z.ZodType>(shape: S, json: unknown, what: 'map' | 'lens' | 'session' | 'saved snapshot' | 'docs page' | 'review comment'): z.infer<S> {
   const parsed = shape.safeParse(json);
   if (!parsed.success) throw new Error(`ShadowGit answered with a ${what} this version of shadowgit-mcp-server does not read. Ask the user to update shadowgit-mcp-server.`, { cause: parsed.error });
   return parsed.data;
@@ -225,8 +225,8 @@ export async function createCheckpoint(input: {
     );
   });
   // Nothing new: an automatic snapshot may have taken the change first, and from 0.3.13 the app checks that snapshot
-  if (status === 409) return { commit: null, filesChanged: 0, ...read(Checkpoint.pick({ rules: true }), json, 'checkpoint') };
-  return read(Checkpoint, json, 'checkpoint');
+  if (status === 409) return { commit: null, filesChanged: 0, ...read(Checkpoint.pick({ rules: true }), json, 'saved snapshot') };
+  return read(Checkpoint, json, 'saved snapshot');
 }
 
 /** The lens of a range for the agent to word: the latest AI session's without a head. The app may draw it inside the request. */

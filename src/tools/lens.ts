@@ -46,7 +46,7 @@ function describeLens(repo: string, lens: NonNullable<Read['lens']>, { range, li
   // stepTitle reads "step title"
   const caps = Object.entries(limits).map(([key, max]) => `${key.replace(/[A-Z]/g, (c) => ` ${c.toLowerCase()}`)} ${max}`).join(', ');
   return [
-    `The Lens of ${repo}, snapshots ${snapshots(range)}; its words now: ${lens.words.source}${lens.words.author ? ` (${lens.words.author})` : ''}.`,
+    `The Lens of ${repo}, snapshots ${snapshots(range)}; its words now: ${lens.words.source === 'agent' ? "an assistant's" : lens.words.source}${lens.words.author ? ` (${lens.words.author})` : ''}.`,
     ...(lens.summary ? [`Summary: ${lens.summary}`] : []),
     `Word it with write_lens_words, ${passing(range)}: a summary of two sentences, for each step a title and one or two sentences, for each changed card the role it plays. Name only the ids below; text past its limit is cut (characters: ${caps}).`,
     ...(lens.quotes?.length ? ['Messages of saved snapshots a why may quote:', ...lens.quotes.map((message) => `- ${JSON.stringify(message)}`)] : []),
