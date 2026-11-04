@@ -8,7 +8,7 @@ import { dataResult, forRepo, repoParam } from './shared.js';
 // The steps after a session, in the answer the model reads at that moment: the Lens of what it changed. The Lens reads
 // snapshots: an app before 0.3.13 leaves edits ended without a checkpoint out of one, so they come first there
 const next = (repo: string | undefined, snapshotted: boolean) =>
-  `${forRepo(repo)}${snapshotted ? '' : 'If its edits are in a checkpoint: '}get_lens, then write_lens_words for the range it gives (a summary, a title and a sentence for each step, a role for each changed card), so the user reads your change in ShadowGit's Lens in your words${snapshotted ? '.' : '; if not, checkpoint them first.'}`;
+  `${forRepo(repo)}${snapshotted ? '' : 'If its edits are in a saved snapshot: '}get_lens, then write_lens_words for the change it gives (a summary, a title and a sentence for each step, a role for each changed card), so the user reads your change in ShadowGit's Lens in your words${snapshotted ? '.' : '; if not, save them with `checkpoint` first.'}`;
 /** Where a session ended, when the app took its unsaved edits into a snapshot as it did. */
 const at = (commit: string | undefined) => (commit === undefined ? '' : ` at snapshot ${commit.slice(0, 8)}, which holds its edits`);
 const Output = z.object({ ended: z.array(z.string()), repo: z.string().nullable(), next: z.string().optional().describe('The step that follows a session') });
@@ -55,7 +55,7 @@ export function registerEndSession(server: McpServer): void {
     {
       title: 'End a ShadowGit session',
       description:
-        'Resume automatic snapshots for a project by ending its active ShadowGit session. Without session_id it ends whatever session is active on the project, and succeeds with nothing to do if there is none. ShadowGit takes changes not saved with checkpoint into a snapshot as the session ends (before ShadowGit 0.3.13, the next automatic snapshot takes them).',
+        'Resume automatic snapshots for a project by ending its active ShadowGit session. Without session_id it ends whatever session is active on the project, and succeeds with nothing to do if there is none. ShadowGit takes changes not saved with `checkpoint` into a snapshot as the session ends (before ShadowGit 0.3.13, the next automatic snapshot takes them).',
       inputSchema: z.object({
         repo: repoParam,
         session_id: z.string().min(1).optional().describe('Defaults to the active session of the project'),

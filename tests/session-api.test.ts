@@ -181,7 +181,7 @@ describe('the rules an app answers', () => {
       rules: {
         range: null,
         status: 'failed',
-        error: "ShadowGit checked this checkpoint against the project's rules and answered in a shape this version of shadowgit-mcp-server does not read. Ask the user to update shadowgit-mcp-server.",
+        error: "ShadowGit checked this saved snapshot against the project's rules and answered in a shape this version of shadowgit-mcp-server does not read. Ask the user to update shadowgit-mcp-server.",
       },
     });
   });
@@ -207,7 +207,7 @@ describe('createCheckpoint', () => {
   it('asks for an app update when the route is missing', async () => {
     app.checkpointStatus = 404;
     await expect(createCheckpoint(checkpointInput)).rejects.toThrow(
-      "This version of ShadowGit can't create checkpoints for AI assistants. Ask the user to update the ShadowGit app.",
+      "This version of ShadowGit can't save snapshots for AI assistants. Ask the user to update the ShadowGit app.",
     );
   });
 
@@ -225,13 +225,13 @@ describe('createCheckpoint', () => {
     expect(asked).toHaveBeenCalledWith(58_000);
   });
 
-  it('warns that the checkpoint may still be saving when the app does not answer', async () => {
+  it('warns that the snapshot may still be saving when the app does not answer', async () => {
     app.hang = true;
     // Stands in for the 58 s wait: the real timeout is replaced by a 50 ms one, which fails the same way.
     const timeout = AbortSignal.timeout.bind(AbortSignal);
     vi.spyOn(AbortSignal, 'timeout').mockImplementation(() => timeout(50));
     await expect(createCheckpoint(checkpointInput)).rejects.toThrow(
-      'ShadowGit did not answer within 58 s; the checkpoint may still be saving. Check with git_command (log -1) before trying again.',
+      'ShadowGit did not answer within 58 s; the snapshot may still be saving. Check with git_command (log -1) before trying again.',
     );
   });
 });

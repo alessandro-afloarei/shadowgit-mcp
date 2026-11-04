@@ -303,7 +303,7 @@ async function listen(): Promise<FakeApp> {
     }
     if (app.lensRoutes && route.startsWith('/lens?')) return json(200, { success: true, ...app.lensAnswer, limits: FAKE_LIMITS });
     if (app.lensRoutes && route === '/lens/words') {
-      if (app.wordsStatus === 409) return json(409, { success: false, error: 'Nothing in this range changes code: it has no lens to word' });
+      if (app.wordsStatus === 409) return json(409, { success: false, error: 'This change touches no code: it has no Lens to word' });
       if (app.wordsStatus === 400) return json(400, { success: false, error: "Not the Lens's words: ✖ Invalid input: expected string, received array\n  → at steps[0].body" });
       return json(200, { success: true, applied: { summary: true, steps: 1, components: 1, layers: 0, flows: 0 }, ignored: ['c99'] });
     }

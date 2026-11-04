@@ -29,12 +29,12 @@ export const RuleCheck = z.object({
   rules: z.number().int().describe('How many rules it was checked against'),
   matches: z.array(z.object({
     rule: Rule,
-    count: z.number().int().describe('How many links the range adds that the rule names'),
+    count: z.number().int().describe('How many links the change adds that the rule names'),
     links: z.array(z.string()).describe('The first links, in words; count has them all'),
     steps: z.array(z.string()).describe('The ids of the steps that hold them'),
   })),
   file: z.object({ added: z.array(z.string()), removed: z.array(z.string()) }).nullable().describe(
-    'The rules the range adds to and removes from .shadowgit-rules; null when it leaves the file alone',
+    'The rules the change adds to and removes from .shadowgit-rules; null when it leaves the file alone',
   ),
 });
 

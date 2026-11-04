@@ -2,18 +2,18 @@
 
 Gives Claude Code, Cursor and Claude Desktop access to [ShadowGit](https://shadowgit.com): the automatic snapshots
 ShadowGit takes of your projects every few minutes, kept apart from your own git history. Your assistant can see what
-changed and when, and can save its own edits as one named checkpoint instead of many partial snapshots.
+changed and when, and can save its own edits as one snapshot with a title instead of many partial ones.
 
 ## Requirements
 
 - Node.js 20 or later
-- The ShadowGit app (0.3.4 or later for checkpoints, a release after 0.3.5 for the Lens, after 0.3.7 for its linked
-  words, after 0.3.9 for the map, after 0.3.10 for the Lens's dependency facts, 0.3.11 or later for the project's
-  rules, 0.3.13 or later for a session's unsaved edits in a snapshot as it ends and for the check of a checkpoint
-  that finds nothing new, 0.4.0 or later for review comments and the docs pages of any range), tracking at least
-  one project.
+- The ShadowGit app (0.3.4 or later for saved snapshots, a release after 0.3.5 for the Lens, after 0.3.7 for its
+  linked words, after 0.3.9 for the map, after 0.3.10 for the Lens's dependency facts, 0.3.11 or later for the
+  project's rules, 0.3.13 or later for a session's unsaved edits in a snapshot as it ends and for the check of a saved
+  snapshot that finds nothing new, 0.4.0 or later for review comments and the docs pages of any change, a release
+  after 0.4.0 for area ids and for where a session is reviewed), tracking at least one project.
   Reading history works while the app is closed;
-  sessions, checkpoints, the Lens, the map and review comments need it running.
+  sessions, saved snapshots, the Lens, the map and review comments need it running.
 - Git on your PATH
 
 ## Setup
@@ -38,12 +38,13 @@ webshop") when ShadowGit tracks more than one.
 
 ## What to ask
 
+- "Show me my ShadowGit projects"
 - "What changed in the last hour?"
 - "When did the login page break?"
 - "Show me the history of Header.tsx"
 - "How is this project organised?"
 - "What depends on chargeCard?"
-- "Start a ShadowGit session for this refactor", then "Create a checkpoint: Fixed login redirect", then "End the
+- "Start a ShadowGit session for this refactor", then "Save a snapshot named Fixed login redirect", then "End the
   ShadowGit session"
 - "Write the Lens words for this session"
 - "What does the billing area do?"
@@ -59,11 +60,11 @@ webshop") when ShadowGit tracks more than one.
 | `get_map` | Gives how the project is organised: its areas, layers and the links between them, or one area, the project's rules and its docs pages' summaries |
 | `get_code_context` | Gives where files and symbols sit, what depends on them, where a change to them lands, the project's rules for them and their areas' docs pages' summaries |
 | `start_session` | Pauses automatic snapshots while the assistant edits |
-| `checkpoint` | Saves the current changes as one named checkpoint, following `.shadowgit-ignore`, then checks it against the project's `.shadowgit-rules` |
+| `checkpoint` | Saves the current changes as one snapshot with a title, following `.shadowgit-ignore`, then checks it against the project's `.shadowgit-rules` |
 | `end_session` | Resumes automatic snapshots |
-| `get_lens` | Reads ShadowGit's Lens of a range, by default the latest AI session, with what it makes depend on what and the links a rule names |
-| `write_lens_words` | Writes the Lens's words for that range, kept in the history, with links, a why and an excerpt |
-| `get_docs` | Reads the project's docs pages, one per map area plus an Overview: by default those the latest AI session changed that need words, each with its facts, its words so far and what changed since them |
+| `get_lens` | Reads ShadowGit's Lens of a change, by default your latest session, with what it makes depend on what and the links a rule names |
+| `write_lens_words` | Writes the Lens's words for that change, kept in the history, with links, a why and an excerpt |
+| `get_docs` | Reads the project's docs pages, one per map area plus an Overview: by default those your latest session changed that need words, each with its facts, its words so far and what changed since them |
 | `write_docs` | Writes pages' words, with links to symbols and areas, or keeps words that still hold; kept in the history, never in the project's files |
 | `get_review_comments` | Reads the review comments you sent from ShadowGit and haven't resolved, by Send, with their lines, words and replies |
 | `reply_to_review_comment` | Replies to one comment: ShadowGit shows the reply under it, with the snapshot that holds the change |
@@ -75,7 +76,7 @@ The other tools work on the current project unless given `repo`.
 `git_command` runs only read-only subcommands, without a shell, and refuses the options that would read or write files
 outside the snapshot history (`--output`, `--no-index`, `blame --contents` and others, including abbreviated and bundled
 forms), the ones that run helper commands from git's configuration (`--ext-diff`, `--textconv`, `--filters`), and paths
-outside the project. Checkpoints are made by the ShadowGit app, only in projects you added to it. The
+outside the project. Saved snapshots are made by the ShadowGit app, only in projects you added to it. The
 server itself only talks to the ShadowGit app on localhost; what it returns goes to your assistant like any tool result.
 
 The server trusts the project's `.shadowgit.git` history, which the ShadowGit app creates. Git honours that history's

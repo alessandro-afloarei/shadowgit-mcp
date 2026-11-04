@@ -9,11 +9,11 @@ import { andList, dataResult, forProject, list, plural, repoParam, type Listed }
 
 const MapOutput = z.object({ repo: z.string(), ...MapRead.shape });
 // The session flow that follows, in the answer the model reads before it edits
-const NEXT = 'Before editing several files: start_session, which pauses snapshots; when the edits are done: checkpoint, end_session, then get_lens and write_lens_words.';
+const NEXT = 'Before editing several files: start_session, which pauses snapshots; when the edits are done: `checkpoint`, end_session, then get_lens and write_lens_words.';
 // When the answer lists rules: what binds is the links they name, never the text around them. Every edit goes through
 // a session: outside one, the app's automatic snapshot takes it within seconds, and the checkpoint has nothing to check
 const NEXT_WITH_RULES =
-  "Add no link the project's rules listed here name, or tell the user why. Before any edit, even to one file: start_session, which pauses snapshots, so the checkpoint checks the change against the rules; when the edits are done: checkpoint, end_session, then get_lens and write_lens_words.";
+  "Add no link the project's rules listed here name, or tell the user why. Before any edit, even to one file: start_session, which pauses snapshots, so `checkpoint` checks the change against the rules; when the edits are done: `checkpoint`, end_session, then get_lens and write_lens_words.";
 const ContextOutput = z.object({ repo: z.string(), ...ContextRead.shape, next: z.string().describe('The steps that follow') });
 
 type Read = z.infer<typeof MapRead>;

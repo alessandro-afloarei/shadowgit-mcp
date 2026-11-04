@@ -51,16 +51,16 @@ describe('checkpoint', () => {
     });
     const [link, call] = CAPTURED.check.matches[0]?.links ?? [];
     expect(textOf(result)).toBe([
-      'Saved checkpoint a1b2c3d4 "Count users in the nightly report" on webshop (2 files).',
+      'Saved snapshot a1b2c3d4 "Count users in the nightly report" on webshop (2 files).',
       `The project's rules (.shadowgit-rules): 1 checked, over snapshots ${CAPTURED.range.base?.slice(0, 8)}..${CAPTURED.range.head.slice(0, 8)}.`,
-      '- "src/jobs never depends on src/api" because "jobs read the database through src/db": names 2 links this range adds (steps c1)',
+      '- "src/jobs never depends on src/api" because "jobs read the database through src/db": names 2 links this change adds (steps c1)',
       `  ${JSON.stringify(link)}`,
       `  ${JSON.stringify(call)}`,
     ].join('\n'));
     expect(link).toBe('src/jobs/report.ts imports src/api/users.ts');
   });
 
-  it('counts the links past the first, says what the range does to the file, and the rules that name none', async () => {
+  it('counts the links past the first, says what the change does to the file, and the rules that name none', async () => {
     const links = ['a', 'b', 'c', 'd', 'e'].map((name) => `src/jobs/${name}.ts imports src/api/users.ts`);
     app.checkpointRules = checked({
       rules: 3,
@@ -68,23 +68,23 @@ describe('checkpoint', () => {
       file: { added: ['nothing depends on lodash'], removed: ['src/ui never depends on src/db'] },
     });
     const text = textOf(await checkpoint({ title: 'Report' }, 'Claude Code'));
-    expect(text).toContain('- "src/jobs never depends on src/api" because "jobs read the database through src/db": names 7 links this range adds\n');
+    expect(text).toContain('- "src/jobs never depends on src/api" because "jobs read the database through src/db": names 7 links this change adds\n');
     expect(text).toContain(`  ${JSON.stringify(links[4])}\n  and 2 more\n`);
-    expect(text).toContain('- The other 2 rules name no link this range adds.\n');
-    expect(text).toMatch(/- This range changes \.shadowgit-rules: adds "nothing depends on lodash", removes "src\/ui never depends on src\/db"\.$/);
+    expect(text).toContain('- The other 2 rules name no link this change adds.\n');
+    expect(text).toMatch(/- This change edits \.shadowgit-rules: adds "nothing depends on lodash", removes "src\/ui never depends on src\/db"\.$/);
   });
 
   it('says the file lost its last rule', async () => {
     app.checkpointRules = checked({ rules: 0, matches: [], file: { added: [], removed: [RULE.text] } });
     const text = textOf(await checkpoint({ title: 'Drop the rules' }, 'Claude Code'));
     expect(text).toContain("The project's rules (.shadowgit-rules): 0 checked, over snapshots bbbbbbbb..cccccccc.\n");
-    expect(text).toContain('- This range changes .shadowgit-rules: removes "src/jobs never depends on src/api".');
+    expect(text).toContain('- This change edits .shadowgit-rules: removes "src/jobs never depends on src/api".');
     expect(text).not.toContain('No rule names');
   });
 
   it('quotes a reason as written', async () => {
     app.checkpointRules = checked({ rules: 1, matches: [{ rule: { ...RULE, because: 'the "db" layer reads it' }, count: 1, links: ['src/jobs/report.ts imports src/api/users.ts'], steps: ['c1'] }] });
-    expect(textOf(await checkpoint({ title: 'Report' }, 'Claude Code'))).toContain('- "src/jobs never depends on src/api" because "the \\"db\\" layer reads it": names 1 link this range adds (steps c1)');
+    expect(textOf(await checkpoint({ title: 'Report' }, 'Claude Code'))).toContain('- "src/jobs never depends on src/api" because "the \\"db\\" layer reads it": names 1 link this change adds (steps c1)');
   });
 
   // A cloned project's file is its author's: its text never stands as a line of ShadowGit's own
@@ -122,7 +122,7 @@ describe('checkpoint', () => {
     try {
       writeFileSync(path.join(tracked, 'README.md'), '# demo, changed\n');
       const outside = await checkpoint({ title: 'Outside' }, 'Claude Code');
-      expect(textOf(outside)).toBe('No changes since the last snapshot; nothing to checkpoint.');
+      expect(textOf(outside)).toBe('No changes since the last snapshot; nothing to save.');
       expect(shadowGit(tracked, ['log', '-1', '--format=%s'])).toBe('Auto snapshot');
       app.sessions.push(fakeSession({ repoPath: tracked }));
       writeFileSync(path.join(tracked, 'README.md'), '# demo, changed again\n');
@@ -138,7 +138,7 @@ describe('checkpoint', () => {
   it('names the range of a check still running, for get_lens', async () => {
     app.checkpointRules = { range: { base: null, head: HEAD }, status: 'running' };
     expect(textOf(await checkpoint({ title: 'Report' }, 'Claude Code'))).toBe([
-      'Saved checkpoint a1b2c3d4 "Report" on webshop (2 files).',
+      'Saved snapshot a1b2c3d4 "Report" on webshop (2 files).',
       `The check against the project's rules (.shadowgit-rules) is still running, over snapshots from the start..cccccccc: read it with get_lens, passing base null and head "${HEAD}".`,
     ].join('\n'));
   });
@@ -149,21 +149,21 @@ describe('checkpoint', () => {
     const result = await checkpoint({ title: 'Count users in the nightly report' }, 'Claude Code');
     expect(result.structuredContent).toEqual({ commit: null, title: 'Count users in the nightly report', files_changed: 0, repo: 'webshop', rules: CAPTURED });
     const text = textOf(result);
-    expect(text).toMatch(/^No changes since the last snapshot; nothing to checkpoint\.\n/);
+    expect(text).toMatch(/^No changes since the last snapshot; nothing to save\.\n/);
     expect(text).toContain(`The project's rules (.shadowgit-rules): 1 checked, over snapshots ${CAPTURED.range.base?.slice(0, 8)}..${CAPTURED.range.head.slice(0, 8)}.`);
   });
 
   it("says why the rules weren't checked", async () => {
     app.checkpointRules = { range: null, status: 'failed', error: '.shadowgit-rules is not a file' };
     expect(textOf(await checkpoint({ title: 'Report' }, 'Claude Code'))).toBe(
-      'Saved checkpoint a1b2c3d4 "Report" on webshop (2 files).\nThe project\'s rules (.shadowgit-rules) weren\'t checked: ".shadowgit-rules is not a file"',
+      'Saved snapshot a1b2c3d4 "Report" on webshop (2 files).\nThe project\'s rules (.shadowgit-rules) weren\'t checked: ".shadowgit-rules is not a file"',
     );
   });
 
   it('answers as before for a project without rules', async () => {
     const result = await checkpoint({ title: 'Report' }, 'Claude Code');
     expect(result.structuredContent).not.toHaveProperty('rules');
-    expect(textOf(result)).toBe('Saved checkpoint a1b2c3d4 "Report" on webshop (2 files).');
+    expect(textOf(result)).toBe('Saved snapshot a1b2c3d4 "Report" on webshop (2 files).');
   });
 });
 
@@ -175,7 +175,7 @@ describe('get_lens', () => {
     const result = await getLens({});
     expect(result.structuredContent).toMatchObject({ repo: 'webshop', rules });
     const text = textOf(result);
-    expect(text).toContain("The project's rules (.shadowgit-rules): 1 checked.\n- \"src/jobs never depends on src/api\" because \"jobs read the database through src/db\": names 2 links this range adds (steps c1)\n");
+    expect(text).toContain("The project's rules (.shadowgit-rules): 1 checked.\n- \"src/jobs never depends on src/api\" because \"jobs read the database through src/db\": names 2 links this change adds (steps c1)\n");
     expect(text.indexOf("The project's rules (.shadowgit-rules)")).toBeLessThan(text.indexOf('Dependencies:'));
     expect(text).toContain('\n  Rules that name its links: "src/jobs never depends on src/api"\n');
   });
@@ -185,10 +185,10 @@ describe('get_lens', () => {
     const result = await getLens({});
     expect(result.structuredContent).toMatchObject({ lens: null, rules: ONLY.rules });
     expect(textOf(result)).toBe([
-      `Nothing in webshop's range ${ONLY.range.head.slice(0, 8)} changes code: it has no lens to word.`,
+      `webshop's change up to ${ONLY.range.head.slice(0, 8)} touches no code: it has no Lens to word.`,
       "The project's rules (.shadowgit-rules): 2 checked.",
-      '- No rule names a link this range adds.',
-      '- This range changes .shadowgit-rules: adds "nothing depends on lodash".',
+      '- No rule names a link this change adds.',
+      '- This change edits .shadowgit-rules: adds "nothing depends on lodash".',
     ].join('\n'));
   });
 
@@ -242,7 +242,7 @@ describe('get_code_context', () => {
   it('lists the rules that hold for the files asked about, and asks to keep to them', async () => {
     app.mapAnswer.context = CONTEXT;
     const result = await getCodeContext(asked, 'Claude Code');
-    expect(result.structuredContent).toMatchObject({ rules: CONTEXT.rules, next: "Add no link the project's rules listed here name, or tell the user why. Before any edit, even to one file: start_session, which pauses snapshots, so the checkpoint checks the change against the rules; when the edits are done: checkpoint, end_session, then get_lens and write_lens_words." });
+    expect(result.structuredContent).toMatchObject({ rules: CONTEXT.rules, next: "Add no link the project's rules listed here name, or tell the user why. Before any edit, even to one file: start_session, which pauses snapshots, so `checkpoint` checks the change against the rules; when the edits are done: `checkpoint`, end_session, then get_lens and write_lens_words." });
     expect(textOf(result)).toContain([
       "\n\nThe project's rules (.shadowgit-rules) that hold for these files:",
       '- "src/jobs never depends on src/api" because "jobs read the database through src/db": "src/jobs/report.ts"',

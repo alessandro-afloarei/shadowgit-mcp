@@ -63,7 +63,7 @@ describe.each(ERAS)('protocol $era', ({ era, mode }) => {
   // left to check: in a project with rules, every edit goes through a session
   it('asks for a session before any edit in a project with rules, never a checkpoint alone', () => {
     expect(INSTRUCTIONS).toContain(
-      '- Any edit, even one line, in a project with rules (get_code_context lists them) or to .shadowgit-rules: start_session first, so the checkpoint checks the change against them.',
+      '- Any edit, even one line, in a project with rules (get_code_context lists them) or to .shadowgit-rules: start_session first, so `checkpoint` checks the change against them.',
     );
     expect(INSTRUCTIONS).not.toContain('checkpoint it before you reply');
   });

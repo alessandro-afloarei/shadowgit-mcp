@@ -42,7 +42,7 @@ export function registerStartSession(server: McpServer): void {
     {
       title: 'Start a ShadowGit session',
       description:
-        "Pause ShadowGit's automatic snapshots for a project while you make a set of related edits, so they can be saved as one checkpoint instead of several partial snapshots. Returns the existing session if one is already active. Needs the ShadowGit app running. To save the edits and resume snapshots, use checkpoint and end_session.",
+        "Pause ShadowGit's automatic snapshots for a project while you make a set of related edits, so they can be saved as one snapshot with a title instead of several partial ones. Returns the existing session if one is already active. Needs the ShadowGit app running. To save the edits and resume snapshots, use `checkpoint` and end_session.",
       inputSchema: z.object({
         description: z.string().min(1).max(200).describe('What you are about to change, e.g. "Fix login redirect"'),
         repo: repoParam,

@@ -168,7 +168,7 @@ describe('get_docs', () => {
   it('says when no page is asked for, with no step to take', async () => {
     app.docsAnswer = { ...DOCS_ANSWERS.session, pages: [] };
     const none = await getDocs({});
-    expect(textOf(none)).toBe("The latest AI session in webshop changed no area whose docs page needs words.");
+    expect(textOf(none)).toBe("Your latest session in webshop changed no area whose docs page needs words.");
     expect(none.structuredContent).not.toHaveProperty('next');
     app.docsAnswer = { ...DOCS_ANSWERS.all, pages: [], next: null };
     expect(textOf(await getDocs({ all: true }))).toBe("Every page of webshop's map has words.");
@@ -185,14 +185,14 @@ describe('get_docs', () => {
     const { head } = DOCS_ANSWERS.range as { head: string };
     expect(result.structuredContent).toEqual(asGiven(DOCS_ANSWERS.range, step('src/api, src/billing and src/jobs', head)));
     app.docsAnswer = { ...DOCS_ANSWERS.range, pages: [] };
-    expect(textOf(await getDocs({ base: null, head: 'c'.repeat(40) }))).toBe('The range changed no area of webshop whose docs page needs words.');
+    expect(textOf(await getDocs({ base: null, head: 'c'.repeat(40) }))).toBe('That change touched no area of webshop whose docs page needs words.');
   });
 
   it('refuses half a range, or a range with areas or all, before asking the app', async () => {
     await expect(getDocs({ head: 'c'.repeat(40) })).rejects.toThrow('Pass base and head together.');
     await expect(getDocs({ base: null })).rejects.toThrow('Pass base and head together.');
     for (const mixed of [{ areas: ['src/billing'] }, { overview: true }, { all: true }, { more: { after: 6, map: 'm' } }]) {
-      await expect(getDocs({ base: null, head: 'c'.repeat(40), ...mixed })).rejects.toThrow('Ask for a range, name areas, or ask for all: one of them.');
+      await expect(getDocs({ base: null, head: 'c'.repeat(40), ...mixed })).rejects.toThrow('Ask for a change with base and head, name areas, or ask for all: one of them.');
     }
     expect(app.requests).toEqual([]);
   });

@@ -31,8 +31,8 @@ const ReviewComment = z.object({
 const ReviewSend = z.object({
   id: z.number().int(),
   at: z.string(),
-  range: Range.extend({ label: z.string() }).nullable().describe('The range open in Changes at the Send; null when none was'),
-  unviewed: z.array(z.string()).nullable().describe('Files of that range the person had not viewed then, at most 20'),
+  range: Range.extend({ label: z.string() }).nullable().describe('The change open in Review at the Send; null when none was'),
+  unviewed: z.array(z.string()).nullable().describe('Files of that change the person had not viewed then, at most 20'),
   moreUnviewed: z.number().int(),
   comments: z.array(ReviewComment),
 });

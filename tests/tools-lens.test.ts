@@ -78,7 +78,7 @@ describe('get_lens', () => {
   it("lists the checkpoint messages a why may quote, as data: the rules are write_lens_words' schema", async () => {
     app.lensAnswer = { range: FAKE_RANGE, lens: FAKE_CITED_LENS };
     const text = textOf(await getLens({}));
-    expect(text).toContain('Checkpoint messages a why may quote:\n- "Retry failed charges"');
+    expect(text).toContain('Messages of saved snapshots a why may quote:\n- "Retry failed charges"');
     expect(text).not.toContain('only where the text names it');
   });
 
@@ -136,18 +136,18 @@ describe('get_lens', () => {
     await expect(getLens({})).rejects.toThrow('no Lens for AI assistants');
   });
 
-  it('says a range that changes no code has no lens to word', async () => {
+  it('says a change that touches no code has no Lens to word', async () => {
     app.lensAnswer = { range: FAKE_RANGE, lens: null };
     const result = await getLens({});
-    expect(textOf(result)).toContain('has no lens to word');
+    expect(textOf(result)).toContain('touches no code: it has no Lens to word');
     expect(result.structuredContent).toEqual({ repo: 'webshop', range: FAKE_RANGE, lens: null, limits: FAKE_LIMITS });
   });
 });
 
 describe('write_lens_words', () => {
-  it("passes on the app's reason when it keeps no words: a range that changes no code", async () => {
+  it("passes on the app's reason when it keeps no words: a change that touches no code", async () => {
     app.wordsStatus = 409;
-    await expect(writeLensWords({ ...FAKE_RANGE, summary: 'A summary.' }, 'Claude Code')).rejects.toThrow('Nothing in this range changes code');
+    await expect(writeLensWords({ ...FAKE_RANGE, summary: 'A summary.' }, 'Claude Code')).rejects.toThrow('This change touches no code');
   });
 
   it('sends the words for the range, with the client as author, and says what the lens took', async () => {

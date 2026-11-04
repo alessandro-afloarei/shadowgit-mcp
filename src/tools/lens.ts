@@ -8,7 +8,7 @@ import { passing, quote, rangeLines, snapshots } from './rules.js';
 import { andList, dataResult, forProject, plural, repoParam, Snapshot } from './shared.js';
 
 const LensOutput = z.object({ repo: z.string(), ...LensRead.shape });
-const WordsOutput = z.object({ repo: z.string(), ...WordsWritten.shape, next: z.string().optional().describe('The step that follows: the docs pages the range changed') });
+const WordsOutput = z.object({ repo: z.string(), ...WordsWritten.shape, next: z.string().optional().describe('The step that follows: the docs pages the change touched') });
 // The docs step is worth a short wait, never a long one: past it the words' answer goes on without it
 const DOCS_PROBE_MS = 20_000;
 
@@ -49,7 +49,7 @@ function describeLens(repo: string, lens: NonNullable<Read['lens']>, { range, li
     `The Lens of ${repo}, snapshots ${snapshots(range)}; its words now: ${lens.words.source}${lens.words.author ? ` (${lens.words.author})` : ''}.`,
     ...(lens.summary ? [`Summary: ${lens.summary}`] : []),
     `Word it with write_lens_words, ${passing(range)}: a summary of two sentences, for each step a title and one or two sentences, for each changed card the role it plays. Name only the ids below; text past its limit is cut (characters: ${caps}).`,
-    ...(lens.quotes?.length ? ['Checkpoint messages a why may quote:', ...lens.quotes.map((message) => `- ${JSON.stringify(message)}`)] : []),
+    ...(lens.quotes?.length ? ['Messages of saved snapshots a why may quote:', ...lens.quotes.map((message) => `- ${JSON.stringify(message)}`)] : []),
     ...rangeLines(rules, rulesFailure),
     ...dependencyLines(lens.dependencies),
     '',
@@ -77,12 +77,12 @@ function describeLens(repo: string, lens: NonNullable<Read['lens']>, { range, li
 }
 
 export async function getLens({ base, head, repo }: { base?: string | null; head?: string; repo?: string }): Promise<CallToolResult> {
-  if ((head === undefined) !== (base === undefined)) throw new Error('Name base and head together (base null starts from the beginning of the history), or neither for the latest AI session.');
+  if ((head === undefined) !== (base === undefined)) throw new Error('Name base and head together (base null starts from the beginning of the history), or neither for your latest session.');
   const project = resolveRepo(repo);
   const read = await readLens({ repoPath: project.path, base, head });
   const data = { repo: project.name, ...read };
   if (read.lens === null) {
-    const nothing = `Nothing in ${project.name}'s range ${read.range.head.slice(0, 8)} changes code: it has no lens to word.`;
+    const nothing = `${project.name}'s change up to ${read.range.head.slice(0, 8)} touches no code: it has no Lens to word.`;
     return dataResult(LensOutput, [nothing, ...rangeLines(read.rules, read.rulesFailure)].join('\n'), data);
   }
   return dataResult(LensOutput, describeLens(project.name, read.lens, read), data);
@@ -120,12 +120,12 @@ export function registerLens(server: McpServer): void {
   server.registerTool(
     'get_lens',
     {
-      title: "Read a range's Lens",
+      title: "Read a change's Lens",
       description:
-        "Read ShadowGit's Lens of a range of snapshots, by default the latest AI session's: its steps with their code, the cards (components) and flows on its canvas, each with an id and its words so far; what the range makes depend on what: each new, gone or two-way dependency between the project's areas and layers, with the links that make it and the steps that hold it; and each of the project's rules (.shadowgit-rules) that names a link the range adds, with its reason, links and steps, also for a range with no Lens. Read it at the end of a session, after the checkpoint, to word it with write_lens_words; your words may say why a dependency appeared, or why a link a rule names is there: say the rule names it, and quote the rule. Needs the ShadowGit app running.",
+        "Read ShadowGit's Lens of a change, the snapshots from base to head, by default your latest session's: its steps with their code, the cards (components) and flows on its canvas, each with an id and its words so far; what the change makes depend on what: each new, gone or two-way dependency between the project's areas and layers, with the links that make it and the steps that hold it; and each of the project's rules (.shadowgit-rules) that names a link the change adds, with its reason, links and steps, also for a change with no Lens. Read it at the end of a session, after the saved snapshot, to word it with write_lens_words; your words may say why a dependency appeared, or why a link a rule names is there: say the rule names it, and quote the rule. Needs the ShadowGit app running.",
       inputSchema: z.object({
-        base: Snapshot.nullable().optional().describe('The snapshot the range starts from, with head (null: the start of the history). Leave both out for the latest AI session'),
-        head: Snapshot.optional().describe("The range's newest snapshot; leave out for the latest AI session"),
+        base: Snapshot.nullable().optional().describe('The snapshot the change starts from, with head (null: the start of the history). Leave both out for your latest session'),
+        head: Snapshot.optional().describe("The change's newest snapshot; leave out for your latest session"),
         repo: repoParam,
       }),
       outputSchema: LensOutput,
@@ -136,9 +136,9 @@ export function registerLens(server: McpServer): void {
   server.registerTool(
     'write_lens_words',
     {
-      title: "Write a range's Lens words",
+      title: "Write the Lens's words",
       description:
-        "Write the words the user reads in ShadowGit's Lens for a range get_lens read: a summary, each step's title and body, with a why and an excerpt, each card's role, by the ids get_lens gave. An older ShadowGit takes plain text alone; text past its limit is cut; unknown ids are left out. The app keeps the words in its history: a card's role shows in any later range while its code is unchanged. When the session changed areas whose docs pages need words, the answer's next names them, the session's last step: get_docs, then write_docs.",
+        "Write the words the user reads in ShadowGit's Lens for a change get_lens read: a summary, each step's title and body, with a why and an excerpt, each card's role, by the ids get_lens gave. An older ShadowGit takes plain text alone; text past its limit is cut; unknown ids are left out. The app keeps the words in its history: a card's role shows in any later change while its code is unchanged. When the session changed areas whose docs pages need words, the answer's next names them, the session's last step: get_docs, then write_docs.",
       inputSchema: z.object({
         base: Snapshot.nullable().describe('The base get_lens answered (null: from the start of the history)'),
         head: Snapshot.describe('The head get_lens answered'),
@@ -164,7 +164,7 @@ export function registerLens(server: McpServer): void {
           .describe("Per step: a title naming what it does, and its words; a step's entry replaces everything written for that step before, so send its title, body, why and excerpt together"),
         components: z.array(z.object({ id: z.string(), role: z.string() })).optional().describe('Per changed card: the role it plays, in a few words'),
         layers: z.array(z.object({ id: z.string(), name: z.string() })).optional().describe('Per layer: a short name, where the default does not say where code runs'),
-        flows: z.array(z.object({ id: z.string(), label: z.string() })).optional().describe('Per flow: a verb phrase, e.g. "draws a range"'),
+        flows: z.array(z.object({ id: z.string(), label: z.string() })).optional().describe('Per flow: a verb phrase, e.g. "draws the map"'),
         repo: repoParam,
       }),
       outputSchema: WordsOutput,

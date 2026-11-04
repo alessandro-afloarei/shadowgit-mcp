@@ -58,7 +58,7 @@ describe('get_review_comments', () => {
     expect(text.split('\n')[0]).toBe('4 open review comments on webshop, in 2 Sends.');
     expect(text).toContain(`#1 [Change] src/api/cart.ts:11 (shipping) · at ${head}\n   >   return total > 50 ? 0 : 5;\n   Free shipping starts at 100, not 50.`);
     expect(text).toContain(`#4 [Note] src/jobs/cleanup.ts:11-13 (purgeLogs) · at ${head}`);
-    expect(text).toContain('Send 2, with no range open:');
+    expect(text).toContain('Send 2, with no change open:');
     expect(text.split('\n').at(-1)).toBe('Next: Change only what each comment asks, then reply to each with reply_to_review_comment: #1, #2, #3 and #4.');
     expect(text).not.toMatch(JUDGING);
   });
@@ -111,7 +111,7 @@ describe('reply_to_review_comment', () => {
     const waiting = await replyToReviewComment({ id: 1, text: 'Raised the threshold to 100.' }, 'Claude Code');
     expect(app.requestsTo('/comments/reply')).toEqual([{ repoPath: project, id: 1, text: 'Raised the threshold to 100.', author: 'Claude Code' }]);
     expect(waiting.structuredContent).toEqual({ repo: 'webshop', id: 1, reply: { by: 'Claude Code', text: 'Raised the threshold to 100.', at: expect.any(String), snapshot: null } });
-    expect(textOf(waiting)).toBe("Your reply is under comment #1 in ShadowGit; it names the snapshot of this session's checkpoint or end.");
+    expect(textOf(waiting)).toBe("Your reply is under comment #1 in ShadowGit; it names the snapshot this session saves next or ends at.");
 
     app.answers['/comments/reply'] = COMMENT_ANSWERS.reply;
     const stamped = await replyToReviewComment({ id: 2, text: 'It rounds a fractional discount to whole cents.' }, 'Claude Code');

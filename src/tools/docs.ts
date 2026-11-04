@@ -25,7 +25,7 @@ type Words = z.infer<typeof DocWords>;
 
 const BOTH = 'Ask for all, or name areas and the overview: not both.';
 const HALF_RANGE = 'Pass base and head together.';
-const ONE_ASK = 'Ask for a range, name areas, or ask for all: one of them.';
+const ONE_ASK = 'Ask for a change with base and head, name areas, or ask for all: one of them.';
 
 /** A page as the answers name it: the Overview, or an area by its id. */
 export const pageName = (key: z.infer<typeof DocKey>) => ('area' in key ? key.area : 'the Overview');
@@ -159,10 +159,10 @@ export async function getDocs({
   const step = written === undefined ? undefined : `${forProject(repo, project)}${written}`;
   const { next: cursor, ...rest } = read;
   const none = ranged
-    ? `The range changed no area of ${project.name} whose docs page needs words.`
+    ? `That change touched no area of ${project.name} whose docs page needs words.`
     : batch
       ? `Every page of ${project.name}'s map has words.`
-      : `The latest AI session in ${project.name} changed no area whose docs page needs words.`;
+      : `Your latest session in ${project.name} changed no area whose docs page needs words.`;
   return dataResult(DocsOutput, describeDocs(project.name, read, none, step), { repo: project.name, ...rest, more: cursor, ...(step !== undefined && { next: step }) });
 }
 
@@ -224,10 +224,10 @@ export function registerDocs(server: McpServer): void {
     {
       title: 'Read docs pages',
       description:
-        "Read the docs pages ShadowGit keeps for a tracked project: one per area of its map, plus an Overview, each written by an AI assistant. A page comes with the facts ShadowGit draws from the map (folder, sizes, layers, what it depends on and what depends on it, processes, its most depended-on symbols, the project's rules that name it), its words so far with who wrote them and at which snapshot, and what changed in the area since them: symbols changed in their code, dependency facts, links that no longer name anything. With no arguments: the pages the latest AI session changed whose words are missing or behind. With base and head: the pages that range changed whose words are missing or behind. With areas, and overview: those pages. With all: pages without words, largest area first, five at a time, with more for the following batch. Answers head, the snapshot write_docs keeps the words at, and next: write the pages' words with write_docs. Needs the ShadowGit app running.",
+        "Read the docs pages ShadowGit keeps for a tracked project: one per area of its map, plus an Overview, each written by an assistant. A page comes with the facts ShadowGit draws from the map (folder, sizes, layers, what it depends on and what depends on it, processes, its most depended-on symbols, the project's rules that name it), its words so far with who wrote them and at which snapshot, and what changed in the area since them: symbols changed in their code, dependency facts, links that no longer name anything. With no arguments: the pages your latest session changed whose words are missing or behind. With base and head: the pages changed between those snapshots whose words are missing or behind. With areas, and overview: those pages. With all: pages without words, largest area first, five at a time, with more for the following batch. Answers head, the snapshot write_docs keeps the words at, and next: write the pages' words with write_docs. Needs the ShadowGit app running.",
       inputSchema: z.object({
-        base: Snapshot.nullable().optional().describe('With head: the pages this range changed, as get_lens names a range; null from the start of the history'),
-        head: Snapshot.optional().describe('With base: the end of the range'),
+        base: Snapshot.nullable().optional().describe('With head: the pages changed between these snapshots, as get_lens names them; null from the start of the history'),
+        head: Snapshot.optional().describe('With base: the newer snapshot'),
         areas: z.array(z.string().min(1)).max(20).optional().describe("Area ids, as get_docs names them: most are the area's folder, as get_map lists it"),
         overview: z.boolean().optional().describe('The Overview page, alone or with areas'),
         all: z.boolean().optional().describe('Pages without words, five at a time'),
