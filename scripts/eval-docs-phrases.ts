@@ -34,6 +34,11 @@ const CASES: { phrase: string; prepare?: (app: FakeApp, project: string) => void
     // list_repos asks the app for its active sessions; the answer alone could come from the working directory.
     passed: ({ app, answer }) => answer.includes('webshop') && app.requestsTo('/session/active').length > 0,
   },
+  // The same asks in ShadowGit's own words, as its docs write them from 2.9.0 on
+  {
+    phrase: 'Show me my ShadowGit projects',
+    passed: ({ app, answer }) => answer.includes('webshop') && app.requestsTo('/session/active').length > 0,
+  },
   { phrase: 'What changed in the last hour?', passed: ({ answer }) => answer.includes('checkout.ts') },
   { phrase: 'Show me the history of Header.tsx', passed: ({ answer }) => answer.includes('Restyle header') },
   {
@@ -56,6 +61,10 @@ const CASES: { phrase: string; prepare?: (app: FakeApp, project: string) => void
   },
   {
     phrase: "Create a checkpoint with message 'Fixed auth bug'",
+    passed: ({ app }) => app.requestsTo('/checkpoint').some((b) => /fixed auth bug/i.test(String(b.title))),
+  },
+  {
+    phrase: "Save a snapshot in ShadowGit named 'Fixed auth bug'",
     passed: ({ app }) => app.requestsTo('/checkpoint').some((b) => /fixed auth bug/i.test(String(b.title))),
   },
   {

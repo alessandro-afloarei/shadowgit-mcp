@@ -62,7 +62,7 @@ function coversLens(words: LensWords | undefined, lens: typeof DISCOUNT_LENS): b
   );
 }
 
-const tally = { session: 0, checkpoint: 0, ended: 0, read: 0, worded: 0, flowed: 0 };
+const tally = { session: 0, checkpoint: 0, ended: 0, read: 0, worded: 0, told: 0, flowed: 0 };
 for (let i = 1; i <= RUNS; i++) {
   const app = await startFakeApp();
   try {
@@ -76,6 +76,8 @@ for (let i = 1; i <= RUNS; i++) {
       get: () => (JSON.stringify(app.requestsTo('/map/context').at(-1) ?? {}).includes('"files"') ? MAP_ANSWERS.checkoutFiles : MAP_ANSWERS.checkoutSymbol),
     });
     app.checkpointsIn = project;
+    // Where a ShadowGit after 0.4.0 says the person reviews the session: the answer should pass it on
+    app.endReview = 'Open webshop in ShadowGit, then Review session.';
     Object.defineProperty(app, 'lensAnswer', { get: () => ({ range: range(), lens: DISCOUNT_LENS }) });
     const stdout = await runTask(app, project);
     const { result, total_cost_usd: cost } = JSON.parse(stdout) as { result: string; total_cost_usd: number };
@@ -90,6 +92,7 @@ for (let i = 1; i <= RUNS; i++) {
         const { head } = range();
         return body.base === base && body.head === head && head !== base && coversLens(body.words as LensWords | undefined, DISCOUNT_LENS);
       }),
+      told: result.includes('Review session'),
     };
     // The session, then the Lens, in the order the instructions give: start, checkpoint, end, read, write
     const order = app.requests.map((r) => r.path.split('?')[0]);
@@ -108,4 +111,5 @@ for (let i = 1; i <= RUNS; i++) {
   }
 }
 console.log(`\nof ${RUNS} runs: ${Object.entries(tally).map(([k, v]) => `${k} ${v}`).join(', ')}`);
-process.exitCode = tally.flowed === RUNS ? 0 : 1;
+// The flow every run; where to review it told in all but one
+process.exitCode = tally.flowed === RUNS && tally.told >= RUNS - 1 ? 0 : 1;
