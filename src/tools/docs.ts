@@ -4,7 +4,7 @@ import { asClient } from '../client-name.js';
 import { DocPiece, DocsCursor, DocsRead, DocsWritten, type DocKey, type DocWords } from '../doc-shapes.js';
 import { resolveRepo } from '../repos.js';
 import { readDocs, sendDocs, type AppDocWrite } from '../session-api.js';
-import { drawnFrom } from './map.js';
+import { areaName, drawnFrom } from './map.js';
 import { quote } from './rules.js';
 import { andList, dataResult, forProject, list, plural, repoParam, Snapshot } from './shared.js';
 
@@ -74,7 +74,7 @@ function factLines(facts: Facts): string[] {
   return [
     `  Facts: ${plural(files, 'file')}, ${plural(symbols, 'symbol')}, ${plural(areas, 'area')}, ${plural(calls, 'call')}, ${plural(processes, 'process')}.`,
     `  Layers: ${facts.layers.map((layer) => `${layer.name} (${layer.kind}, ${plural(layer.files, 'file')})`).join(', ')}.`,
-    `  Areas: ${list(facts.areas, (area) => `${quote(area.label)} (area ${area.id}): ${plural(area.files, 'file')}, ${plural(area.symbols, 'symbol')}`, '; ')}.`,
+    `  Areas: ${list(facts.areas, (area) => `${areaName(area.label, area.id)}: ${plural(area.files, 'file')}, ${plural(area.symbols, 'symbol')}`, '; ')}.`,
     ...(facts.links.total > 0 ? [`  Links between areas: ${list(facts.links, ({ from, to, count }) => `${quote(from.label)} → ${quote(to.label)} (${count})`)}.`] : []),
     ...(facts.processes.total > 0 ? [`  Processes: ${list(facts.processes, ({ label, areas: through }) => `${label} (${through.map(quote).join(' → ')})`, '; ')}.`] : []),
   ];

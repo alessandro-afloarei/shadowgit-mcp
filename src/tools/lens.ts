@@ -41,12 +41,15 @@ function dependencyLines(dependencies: LensDependencies): string[] {
   return ['Dependencies:', ...dependencies.facts.flatMap(factLines), ...(dependencies.more > 0 ? [`- and ${dependencies.more} more`] : [])];
 }
 
+/** Whose words the Lens holds: the app's "agent" is an assistant, named when known; another source as the app says it. */
+const wordsBy = ({ source, author }: { source: string; author: string | null }) => `${source === 'agent' ? "an assistant's" : source}${author ? ` (${author})` : ''}`;
+
 /** The lens as the model reads it: what to send back, then every step with its code, every card, layer and flow by id. */
 function describeLens(repo: string, lens: NonNullable<Read['lens']>, { range, limits, rules, rulesFailure }: Read): string {
   // stepTitle reads "step title"
   const caps = Object.entries(limits).map(([key, max]) => `${key.replace(/[A-Z]/g, (c) => ` ${c.toLowerCase()}`)} ${max}`).join(', ');
   return [
-    `The Lens of ${repo}, snapshots ${snapshots(range)}; its words now: ${lens.words.source === 'agent' ? "an assistant's" : lens.words.source}${lens.words.author ? ` (${lens.words.author})` : ''}.`,
+    `The Lens of ${repo}, snapshots ${snapshots(range)}; its words now: ${wordsBy(lens.words)}.`,
     ...(lens.summary ? [`Summary: ${lens.summary}`] : []),
     `Word it with write_lens_words, ${passing(range)}: a summary of two sentences, for each step a title and one or two sentences, for each changed card the role it plays. Name only the ids below; text past its limit is cut (characters: ${caps}).`,
     ...(lens.quotes?.length ? ['Messages of saved snapshots a why may quote:', ...lens.quotes.map((message) => `- ${JSON.stringify(message)}`)] : []),

@@ -120,6 +120,7 @@ export interface LensWords {
 }
 
 export type ActiveSession = z.infer<typeof Session>;
+export type SessionEnd = z.infer<typeof EndedSession>;
 
 const baseUrl = () => process.env.SHADOWGIT_SESSION_API ?? 'http://localhost:45289/api';
 
@@ -204,7 +205,7 @@ export async function startSession(repoPath: string, description: string, aiTool
  * The snapshot the session ended at, holding the edits it never saved (none from an app before 0.3.13), and where the
  * person reviews it, in the app's words (none from an app 0.4.0 or older, or for a session that holds no snapshot).
  */
-export async function endSession(sessionId: string): Promise<z.infer<typeof EndedSession>> {
+export async function endSession(sessionId: string): Promise<SessionEnd> {
   // The app saves the unsaved edits inside this request, as `checkpoint` does
   const { json } = await request('/session/end', { sessionId }, { timeoutMs: SLOW_REQUEST_TIMEOUT_MS });
   return read(EndedSession, json, 'session');

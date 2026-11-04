@@ -2,14 +2,18 @@ import type { CallToolResult, McpServer } from '@modelcontextprotocol/server';
 import * as z from 'zod/v4';
 import { asClient } from '../client-name.js';
 import { readRepos, repoArgument, resolveRepo } from '../repos.js';
-import { activeSessions, endSession as endAppSession } from '../session-api.js';
+import { activeSessions, endSession as endAppSession, type SessionEnd } from '../session-api.js';
 import { dataResult, forRepo, repoParam } from './shared.js';
 
 // The steps after a session, in the answer the model reads at that moment: the Lens of what it changed. The Lens reads
 // snapshots: an app before 0.3.13 leaves edits ended without a checkpoint out of one, so they come first there
+const LENS_STEP =
+  "get_lens, then write_lens_words for the change it gives (a summary, a title and a sentence for each step, a role for each changed card), so the user reads your change in ShadowGit's Lens in your words";
 // The app names where the person reviews it, in its own words: an app 0.4.0 or older names nothing
-const next = (repo: string | undefined, snapshotted: boolean, review: string | undefined) =>
-  `${forRepo(repo)}${snapshotted ? '' : 'If its edits are in a saved snapshot: '}get_lens, then write_lens_words for the change it gives (a summary, a title and a sentence for each step, a role for each changed card), so the user reads your change in ShadowGit's Lens in your words${snapshotted ? '.' : '; if not, save them with `checkpoint` first.'}${review === undefined ? '' : ` Then tell the user: ${review}`}`;
+function next(repo: string | undefined, snapshotted: boolean, review: string | undefined): string {
+  const lens = snapshotted ? `${LENS_STEP}.` : `If its edits are in a saved snapshot: ${LENS_STEP}; if not, save them with \`checkpoint\` first.`;
+  return `${forRepo(repo)}${lens}${review === undefined ? '' : ` Then tell the user: ${review}`}`;
+}
 /** Where a session ended, when the app took its unsaved edits into a snapshot as it did. */
 const at = (commit: string | undefined) => (commit === undefined ? '' : ` at snapshot ${commit.slice(0, 8)}, which holds its edits`);
 const Output = z.object({ ended: z.array(z.string()), repo: z.string().nullable(), next: z.string().optional().describe('The step that follows a session') });
@@ -34,13 +38,14 @@ export async function endSession({ repo, session_id }: { repo?: string; session_
   }
   const project = resolveRepo(repo);
   const ended = sessions.filter((s) => s.repoPath === project.path).map((s) => s.id);
-  const ends: Awaited<ReturnType<typeof endAppSession>>[] = [];
+  const ends: SessionEnd[] = [];
   for (const id of ended) ends.push(await endAppSession(id));
-  if (ended.length > 0) {
-    // Each end snapshots what is left unsaved, so the last holds every session's edits, and is the one to review
+  // Each end snapshots what is left unsaved, so the last holds every session's edits, and is the one to review
+  const last = ends.at(-1);
+  if (last !== undefined) {
     const snapshotted = ends.every(({ commit }) => commit !== undefined);
-    const steps = next(repo === undefined ? undefined : repoArgument(project), snapshotted, ends.at(-1)?.review);
-    const text = `Ended ${ended.join(', ')} on ${project.name}${at(snapshotted ? ends.at(-1)?.commit : undefined)}. Automatic snapshots resumed. Next: ${steps}`;
+    const steps = next(repo === undefined ? undefined : repoArgument(project), snapshotted, last.review);
+    const text = `Ended ${ended.join(', ')} on ${project.name}${at(snapshotted ? last.commit : undefined)}. Automatic snapshots resumed. Next: ${steps}`;
     return dataResult(Output, text, { ended, repo: project.name, next: steps });
   }
   if (sessions.length === 0) return dataResult(Output, 'No active session; automatic snapshots are already on.', { ended, repo: project.name });

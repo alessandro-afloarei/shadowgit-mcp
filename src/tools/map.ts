@@ -50,10 +50,13 @@ function docsLines(docs: Read['docs']): string[] {
   return ['Docs pages (get_docs reads them):', ...docs.map(({ area, summary, behind }) => `- ${area}: ${summary}${since(behind)}`)];
 }
 
+/** An area in a sentence: its label quoted, as it may hold ": " and commas, and the id get_map and get_docs take. */
+export const areaName = (label: string, id: string) => `${quote(label)} (area ${id})`;
+
 /** What each area holding a target is for, from its docs page, before the edit. */
 function contextDocsLines(docs: z.infer<typeof ContextRead>['docs']): string[] {
   if (!docs?.length) return [];
-  return ['Docs pages of their areas (get_docs reads them):', ...docs.map(({ area, label, summary }) => `- ${quote(label)} (area ${area}): ${summary}`)];
+  return ['Docs pages of their areas (get_docs reads them):', ...docs.map(({ area, label, summary }) => `- ${areaName(label, area)}: ${summary}`)];
 }
 
 function describeSummary(repo: string, mapAsOf: AsOf, summary: NonNullable<Read['summary']>, docs: Read['docs']): string {
@@ -63,7 +66,7 @@ function describeSummary(repo: string, mapAsOf: AsOf, summary: NonNullable<Read[
     `${plural(files, 'file')}, ${plural(symbols, 'symbol')}, ${plural(areas, 'area')}, ${plural(calls, 'call')}, ${plural(processes, 'process')}.`,
     `Layers: ${summary.layers.map((layer) => `${layer.name} (${layer.kind}, ${plural(layer.files, 'file')})`).join(', ')}.`,
     'Areas, largest first:',
-    bullets(summary.areas, 'area', (area) => `${quote(area.label)} (area ${area.id ?? area.path}): ${plural(area.files, 'file')}, ${plural(area.symbols, 'symbol')}; layers ${area.layers.join(', ')}`),
+    bullets(summary.areas, 'area', (area) => `${areaName(area.label, area.id ?? area.path)}: ${plural(area.files, 'file')}, ${plural(area.symbols, 'symbol')}; layers ${area.layers.join(', ')}`),
     ...docsLines(docs),
     'Links between areas, heaviest first:',
     bullets(summary.links, 'link', (link) => `${quote(link.from)} → ${quote(link.to)}: ${link.count} calls and imports`),
@@ -74,7 +77,7 @@ function describeSummary(repo: string, mapAsOf: AsOf, summary: NonNullable<Read[
 
 function describeArea(repo: string, mapAsOf: AsOf, area: NonNullable<Read['area']>): string {
   // A newer snapshot may hold it: the answer says how old the map is
-  if (area.kind === 'missing') return `No area or folder "${area.target}" on ${repo}'s map.${area.near.length > 0 ? ` Near: ${area.near.map(quote).join(', ')}.` : ''} The map is ${drawnFrom(mapAsOf)}`;
+  if (area.kind === 'missing') return `No area or folder ${quote(area.target)} on ${repo}'s map.${area.near.length > 0 ? ` Near: ${area.near.map(quote).join(', ')}.` : ''} The map is ${drawnFrom(mapAsOf)}`;
   const name = area.areas.length === 1 && area.areas[0] === area.target ? `The ${quote(area.target)} area of ${repo}'s map` : `${quote(area.target)} (areas ${andList(area.areas.map(quote))}) on ${repo}'s map`;
   return [
     `${name}, ${drawnFrom(mapAsOf)}`,

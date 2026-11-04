@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { readdirSync, readFileSync } from 'node:fs';
 import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import ts from 'typescript';
 
 /**
@@ -33,19 +34,17 @@ function sentencesIn(source: string): Sentence[] {
 function proseLines(markdown: string): Sentence[] {
   let fenced = false;
   return markdown.split('\n').flatMap((text, index) => {
-    if (text.trimStart().startsWith('```')) fenced = !fenced;
-    return fenced || text.trimStart().startsWith('```') ? [] : [{ line: index + 1, text }];
+    const fence = text.trimStart().startsWith('```');
+    if (fence) fenced = !fenced;
+    return fence || fenced ? [] : [{ line: index + 1, text }];
   });
 }
 
 const oldWordsIn = (file: string, sentences: Sentence[]) =>
   sentences.filter(({ text }) => OLD_WORDS.test(text.replace(/`[^`]*`/g, ''))).map(({ line, text }) => `${file}:${line}: ${text}`);
 
-const sourceFiles = (dir: string): string[] =>
-  readdirSync(dir, { withFileTypes: true }).flatMap((entry) => {
-    const file = path.join(dir, entry.name);
-    return entry.isDirectory() ? sourceFiles(file) : file.endsWith('.ts') ? [file] : [];
-  });
+const ROOT = fileURLToPath(new URL('..', import.meta.url));
+const SOURCES = readdirSync(path.join(ROOT, 'src'), { recursive: true, encoding: 'utf8' }).filter((file) => file.endsWith('.ts'));
 
 describe('the words', () => {
   it('reads sentences, never code spans', () => {
@@ -61,8 +60,8 @@ describe('the words', () => {
 
   it("says every sentence in the person's words", () => {
     const hits = [
-      ...sourceFiles('src').flatMap((file) => oldWordsIn(file, sentencesIn(readFileSync(file, 'utf8')))),
-      ...oldWordsIn('README.md', proseLines(readFileSync('README.md', 'utf8'))),
+      ...SOURCES.flatMap((file) => oldWordsIn(`src/${file}`, sentencesIn(readFileSync(path.join(ROOT, 'src', file), 'utf8')))),
+      ...oldWordsIn('README.md', proseLines(readFileSync(path.join(ROOT, 'README.md'), 'utf8'))),
     ];
     expect(hits).toEqual([]);
   });

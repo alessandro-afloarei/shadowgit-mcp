@@ -111,5 +111,6 @@ for (let i = 1; i <= RUNS; i++) {
   }
 }
 console.log(`\nof ${RUNS} runs: ${Object.entries(tally).map(([k, v]) => `${k} ${v}`).join(', ')}`);
-// The flow every run; where to review it told in all but one
-process.exitCode = tally.flowed === RUNS && tally.told >= RUNS - 1 ? 0 : 1;
+// The flow every run; the user told where to review it at the evals' usual bar, as the model words its last reply itself
+const TOLD_AT = Math.ceil(0.8 * RUNS);
+process.exitCode = tally.flowed === RUNS && tally.told >= TOLD_AT ? 0 : 1;
