@@ -2,6 +2,36 @@
 
 All notable changes to the ShadowGit MCP Server will be documented in this file.
 
+## [2.9.0] - 2026-11-04
+
+### Changed
+- What your assistant reads from ShadowGit, and so says to you, uses ShadowGit's words: a saved snapshot (never a
+  checkpoint), a change or your session (never a range or the latest AI session), a snapshot (never a commit), a project
+  (never a repository). Tool names, parameters and output fields are unchanged.
+  - Titles you see in your assistant: "Save a ShadowGit snapshot", "Read a change's Lens", "Write the Lens's words".
+  - The instructions keep their meaning at 1,798 characters.
+  - `tests/words.test.ts` reads every sentence the server writes, and its README, and fails on an old word.
+- Area labels written into a sentence are quoted, in `get_map`, `get_code_context` and `get_docs`: a ShadowGit after
+  0.4.0 names a slice of a big folder by what it holds, "src: wiki files" or "lib: part0, part1 and 2 more", which reads
+  as one name only in quotes.
+
+### Added
+- `end_session` tells your assistant where you review the session: "Then tell the user: Open webshop in ShadowGit,
+  then Review session." The sentence is the app's own, for a session that holds a snapshot; a ShadowGit 0.4.0 or older
+  sends none, and the answer reads as before.
+- `get_map` lists each area's id, which stays while its label follows what it holds, and takes an id as `area`
+  (ShadowGit after 0.4.0).
+- Evals, with these changes:
+  - `npm run eval`: 16 of 17 phrases, the two new ones in ShadowGit's words included ("Show me my ShadowGit projects",
+    "Save a snapshot in ShadowGit named 'Fixed auth bug'"). "What does the billing area do?" missed once, answered
+    from `get_map` and the files, as in 2.7.0.
+  - `npm run eval:lens`: the session's Lens flow ran in 5 of 5 runs, and 5 of 5 told the user to open the project,
+    then Review session.
+  - `npm run eval:docs`: 8 of 10 runs wrote both pages after the Lens's words.
+  - `npm run eval:comments`: 10 of 10 runs addressed the comments as asked.
+  - `npm run eval:map`: 5 of 5 runs read the code's context before the first edit.
+  - `npm run eval:rules`: 10 of 10 runs kept to the rule, each inside a session.
+
 ## [2.8.0] - 2026-11-03
 
 ### Added
