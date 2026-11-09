@@ -2,6 +2,14 @@
 
 All notable changes to the ShadowGit MCP Server will be documented in this file.
 
+## [2.10.0] - 2026-11-09
+
+### Added
+- Your assistant knows what a session is for: `start_session` says a session is what you then review in ShadowGit, so
+  asking it to "start a ShadowGit session" does that.
+- The app knows which server it talks to: every request names the server's version (`x-shadowgit-mcp-version`). A
+  ShadowGit after 0.5.0 shows it beside your connected assistant, and says when it is out of date.
+
 ## [2.9.0] - 2026-11-04
 
 ### Changed

@@ -59,6 +59,14 @@ describe.each(ERAS)('protocol $era', ({ era, mode }) => {
     expect(INSTRUCTIONS).not.toMatch(JUDGING);
   });
 
+  // A person asks for "a ShadowGit session" in their own words: the tool says that is what they review afterwards
+  it("says in start_session that a session is what the person reviews, started when they ask for a ShadowGit session", async () => {
+    const { tools } = await client.listTools();
+    expect(tools.find((each) => each.name === 'start_session')?.description).toContain(
+      'A session is what the person then reviews in ShadowGit: start one when they ask you to start a ShadowGit session.',
+    );
+  });
+
   // Outside a session the app's automatic snapshot takes an edit within seconds, and a checkpoint after it has nothing
   // left to check: in a project with rules, every edit goes through a session
   it('asks for a session before any edit in a project with rules, never a checkpoint alone', () => {

@@ -56,6 +56,15 @@ describe('sessions', () => {
     expect(app.requests.at(-1)?.client).toBe('Cursor%20%E2%9C%A8');
   });
 
+  // The app shows the server's version, and says when it is out of date: every request names it, in a call or not
+  it("names the server's own version to the app on every request", async () => {
+    const { VERSION } = await import('../src/version.js');
+    const { callingClient } = await import('../src/client-name.js');
+    await activeSessions();
+    await callingClient.run('Claude Code', () => activeSessions());
+    expect(app.versions.slice(-2)).toEqual([VERSION, VERSION]);
+  });
+
   it('reports an app that does not answer as AppNotRunningError, naming the endpoint it asked', async () => {
     const closed = await closedAppUrl();
     vi.stubEnv('SHADOWGIT_SESSION_API', closed);

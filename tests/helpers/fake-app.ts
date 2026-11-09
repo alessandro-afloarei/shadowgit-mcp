@@ -22,6 +22,8 @@ export interface FakeApp {
   url: string;
   /** Every request, with its path relative to /api, and the client the server named in its header (null without one). */
   requests: { path: string; body: Record<string, unknown>; client: string | null }[];
+  /** The `x-shadowgit-mcp-version` of each request, in order; null for one without. */
+  versions: (string | null)[];
   /** The bodies of the requests to one route, in order. */
   requestsTo(route: string): Record<string, unknown>[];
   sessions: FakeSession[];
@@ -216,6 +218,7 @@ async function listen(): Promise<FakeApp> {
   const app: FakeApp = {
     url: `http://127.0.0.1:${port}/api`,
     requests: [],
+    versions: [],
     requestsTo: (route) => app.requests.filter((r) => r.path === route).map((r) => r.body),
     sessions: [],
     checkpointStatus: 200,
@@ -254,6 +257,8 @@ async function listen(): Promise<FakeApp> {
     const route = (req.url ?? '').replace(/^\/api/, '');
     const client = req.headers['x-shadowgit-client'];
     app.requests.push({ path: route, body, client: typeof client === 'string' ? client : null });
+    const version = req.headers['x-shadowgit-mcp-version'];
+    app.versions.push(typeof version === 'string' ? version : null);
     if (app.hang) return;
     if (app.hangBody) {
       res.writeHead(200, { 'content-type': 'application/json' });
