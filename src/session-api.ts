@@ -5,6 +5,7 @@ import { AreaRead, ContextRead, SummaryRead } from './map-shapes.js';
 import { CheckpointRules, Range, RuleCheck, RulesFailure } from './rule-shapes.js';
 import { callingClient } from './client-name.js';
 import { toLocalIso } from './time.js';
+import { VERSION } from './version.js';
 
 export class AppNotRunningError extends Error {
   constructor(options?: ErrorOptions) {
@@ -153,7 +154,8 @@ async function request(
   try {
     response = await fetch(`${baseUrl()}${route}`, {
       method: body ? 'POST' : 'GET',
-      headers: { ...(body && { 'content-type': 'application/json' }), ...clientHeader() },
+      // The server's version on every request: the app shows it, and says when it is out of date
+      headers: { ...(body && { 'content-type': 'application/json' }), 'x-shadowgit-mcp-version': VERSION, ...clientHeader() },
       body: body ? JSON.stringify(body) : undefined,
       signal: AbortSignal.timeout(timeoutMs),
     });

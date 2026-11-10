@@ -1892,7 +1892,7 @@
       "openWorldHint": false,
       "readOnlyHint": false
     },
-    "description": "Pause ShadowGit's automatic snapshots for a project while you make a set of related edits, so they can be saved as one snapshot with a title instead of several partial ones. Returns the existing session if one is already active. Needs the ShadowGit app running. To save the edits and resume snapshots, use `checkpoint` and end_session.",
+    "description": "Pause ShadowGit's automatic snapshots for a project while you make a set of related edits, so they can be saved as one snapshot with a title instead of several partial ones. A session is what the person then reviews in ShadowGit: start one when they ask you to start a ShadowGit session. Returns the existing session if one is already active. Needs the ShadowGit app running. To save the edits and resume snapshots, use `checkpoint` and end_session.",
     "inputSchema": {
       "$schema": "https://json-schema.org/draft/2020-12/schema",
       "properties": {
