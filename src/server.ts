@@ -28,7 +28,7 @@ export const INSTRUCTIONS = [
 export const OUTLINE_BUDGET = 4_000 - INSTRUCTIONS.length - 1;
 
 /** The server, its instructions ending with the project's outline when there is one. */
-export function buildServer(outline: string | null = null): McpServer {
+export function buildServer(outline: string | null): McpServer {
   const server = new McpServer(
     { name: 'shadowgit', title: 'ShadowGit', version: VERSION, websiteUrl: 'https://shadowgit.com' },
     { instructions: outline === null ? INSTRUCTIONS : `${INSTRUCTIONS}\n${outline}` },

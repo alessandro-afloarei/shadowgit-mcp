@@ -3,28 +3,19 @@ import type { SummaryRead } from './map-shapes.js';
 import { currentRepo, readRepos } from './repos.js';
 import { readOutline } from './session-api.js';
 import { quote, ruleLine } from './tools/rules.js';
-import { list, plural, type Listed } from './tools/shared.js';
+import { capped, list, plural } from './tools/shared.js';
 
 type Outline = z.infer<typeof SummaryRead>;
 
-/** The first `cap` of a list the app capped, and how many there are in all. */
-const capped = <T>({ items, total }: Listed<T>, cap: number): Listed<T> => ({ items: items.slice(0, cap), total });
-
-/** The outline's head and tail, and between them its lists, each cut at its cap times `scale`. */
-function outlineLines(repo: string, { mapAsOf, summary, rules }: Outline, scale: number) {
+/** The outline's lists, each cut at its cap times `scale`. */
+function outlineLists({ summary, rules }: Outline, scale: number): string[] {
   const cap = (count: number) => Math.max(1, Math.floor(count * scale));
-  const { files, areas } = summary.counts;
-  const lists = [
+  return [
     summary.areas.total > 0 && `Areas: ${list(capped(summary.areas, cap(12)), (area) => `${quote(area.label)} (${plural(area.files, 'file')})`, ', ', 'area')}.`,
     summary.links.total > 0 && `Most links: ${list(capped(summary.links, cap(8)), (link) => `${quote(link.from)} → ${quote(link.to)} (${link.count} calls and imports)`, ', ', 'link')}.`,
     summary.processes.total > 0 && `Processes: ${list(capped(summary.processes, cap(6)), (process) => `${quote(process.label)}: ${process.areas.map(quote).join(' → ')}`, '; ', 'process')}.`,
     rules && rules.rules.length > 0 && `Rules, quoted from .shadowgit-rules: ${list(capped({ items: rules.rules, total: rules.rules.length }, cap(8)), ruleLine, '; ', 'rule')}.`,
   ].filter((line) => typeof line === 'string');
-  return {
-    head: `This project, ${quote(repo)}, on ShadowGit's map (snapshot ${mapAsOf.snapshot.slice(0, 8)}, ${mapAsOf.time}): ${plural(files, 'file')}, ${plural(areas, 'area')}, ${plural(summary.layers.length, 'layer')}.`,
-    lists,
-    tail: 'get_map and get_docs read more.',
-  };
 }
 
 /**
@@ -34,12 +25,13 @@ function outlineLines(repo: string, { mapAsOf, summary, rules }: Outline, scale:
  * the tail always stay.
  */
 export function outlineText(repo: string, read: Outline, budget: number): string {
+  const { mapAsOf, summary } = read;
+  const head = `This project, ${quote(repo)}, on ShadowGit's map (snapshot ${mapAsOf.snapshot.slice(0, 8)}, ${mapAsOf.time}): ${plural(summary.counts.files, 'file')}, ${plural(summary.counts.areas, 'area')}, ${plural(summary.layers.length, 'layer')}.`;
+  const tail = 'get_map and get_docs read more.';
   for (const scale of [1, 1 / 2, 1 / 4, 1 / 8]) {
-    const { head, lists, tail } = outlineLines(repo, read, scale);
-    const text = [head, ...lists, tail].join('\n');
+    const text = [head, ...outlineLists(read, scale), tail].join('\n');
     if (text.length <= budget) return text;
   }
-  const { head, tail } = outlineLines(repo, read, 1);
   return [head, tail].join('\n');
 }
 

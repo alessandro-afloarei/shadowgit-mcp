@@ -17,6 +17,9 @@ export class AppNotRunningError extends Error {
   }
 }
 
+/** An app older than the route: its message asks for an update. */
+export class AppWithoutRouteError extends Error {}
+
 /** No answer in time: the app may be busy rather than closed, and may still act on the request. */
 export class AppTimeoutError extends Error {
   constructor(seconds: number, options?: ErrorOptions) {
@@ -176,7 +179,7 @@ async function request(
   // An app without the route answers 'Not found', or a page before 0.3.4; a route's own 404 gives its reason
   if (response.status === 404 && missing !== undefined) {
     const reply = ErrorReply.safeParse(json);
-    if (!reply.success || reply.data.error === NO_ROUTE) throw new Error(missing);
+    if (!reply.success || reply.data.error === NO_ROUTE) throw new AppWithoutRouteError(missing);
   }
   if (response.status !== 200 && !accept.includes(response.status)) throw failure(response.status, json);
   return { status: response.status, json };
@@ -313,17 +316,20 @@ export function readEditFacts(input: { repoPath: string; aiTool: string; since: 
   return factsAnswer(FactsEdit, { ...input, moment: 'edit' });
 }
 
-/** Tells the app a block of facts reached the assistant, by its counts alone. */
-export async function sendFactsDelivered(input: {
-  repoPath: string;
-  aiTool: string;
-  moment: 'read' | 'edit';
-  symbols: number;
-  dependents: number;
-  rules: number;
-  chars: number;
-  ms: number;
-}): Promise<void> {
+/** A block of facts that reached the assistant, by its counts alone. */
+export interface FactsDelivered {
+  readonly repoPath: string;
+  readonly aiTool: string;
+  readonly moment: 'read' | 'edit';
+  readonly symbols: number;
+  readonly dependents: number;
+  readonly rules: number;
+  readonly chars: number;
+  readonly ms: number;
+}
+
+/** Tells the app a block of facts reached the assistant. */
+export async function sendFactsDelivered(input: FactsDelivered): Promise<void> {
   await request('/map/facts/delivered', input);
 }
 

@@ -5,10 +5,10 @@ import type { EditedSymbol, FactsEdit, FactsRead } from '../fact-shapes.js';
 import { runGit } from '../git.js';
 import type { DependentRef } from '../map-shapes.js';
 import { currentRepo, projectOfFile, readRepos } from '../repos.js';
-import { APP_WITHOUT_FACTS, AppNotRunningError, readEditFacts, readFileFacts, sendFactsDelivered } from '../session-api.js';
-import { counts } from './map.js';
+import { AppNotRunningError, AppWithoutRouteError, readEditFacts, readFileFacts, sendFactsDelivered, type FactsDelivered } from '../session-api.js';
+import { areaCount, counts } from './map.js';
 import { quote, ruleLine } from './rules.js';
-import { andList, list, plural } from './shared.js';
+import { capList, capped, list, plural, report } from './shared.js';
 
 // The hooks' budgets (the spec's sections 3 and 4): Claude Code caps a hook's context at 10,000 characters, and an
 // exploring subagent reads dozens of files
@@ -32,7 +32,7 @@ type HookArgs = z.infer<typeof HookInput>;
 /** A whole value the hook left as written: a placeholder it couldn't fill (`${agent_id}` in the main thread). */
 const PLACEHOLDER = /^\$\{[^}]*\}$/;
 /** A value the hook filled in: none for nothing or a placeholder; a patch's own `${…}` is code, and stays. */
-const filled = (value: string | null | undefined) => (value === null || value === undefined || value === '' || PLACEHOLDER.test(value) ? undefined : value);
+const filled = (value?: string | null) => (value && !PLACEHOLDER.test(value) ? value : undefined);
 
 type Baseline = { ok: true; snapshot: string | null } | { ok: false; error: string };
 
@@ -41,8 +41,6 @@ export interface FactsMemory {
   readonly said: Set<string>;
   readonly baselines: Map<string, Promise<Baseline>>;
 }
-
-const report = (error: unknown) => process.stderr.write(`shadowgit-mcp-server: ${error instanceof Error ? error.message : String(error)}\n`);
 
 /** The project's newest snapshot; null for a project with none yet. */
 async function newestSnapshot(projectPath: string): Promise<Baseline> {
@@ -72,12 +70,12 @@ function baselineOf(memory: FactsMemory, projectPath: string): Promise<Baseline>
  */
 export function createFactsMemory(): FactsMemory {
   const memory: FactsMemory = { said: new Set(), baselines: new Map() };
-  void Promise.resolve()
-    .then(() => {
-      const start = currentRepo(readRepos());
-      if (start !== null) void baselineOf(memory, start.path);
-    })
-    .catch(report);
+  try {
+    const start = currentRepo(readRepos());
+    if (start !== null) void baselineOf(memory, start.path);
+  } catch (error) {
+    report(error);
+  }
   return memory;
 }
 
@@ -88,25 +86,13 @@ export function patchPaths(patch: string): string[] {
 }
 
 /** A block a hook adds, its project and moment, and the counts the app records of it. */
-interface Block {
-  readonly moment: 'read' | 'edit';
-  readonly repoPath: string;
-  readonly text: string;
-  readonly symbols: number;
-  readonly dependents: number;
-  readonly rules: number;
-}
+type Block = Omit<FactsDelivered, 'aiTool' | 'chars' | 'ms'> & { readonly text: string };
 
 /** The first rendering that fits `max` characters, else the last (the one that shows least), cut at `max` if it must. */
 function fitting<T extends { text: string }>(attempts: readonly [T, ...T[]], max: number): T {
   const chosen = attempts.find((attempt) => attempt.text.length <= max) ?? attempts[attempts.length - 1] ?? attempts[0];
   return chosen.text.length <= max ? chosen : { ...chosen, text: `${chosen.text.slice(0, max - 1)}…` };
 }
-
-type AreaCounts = readonly { area: string; count: number }[];
-/** The areas that use a symbol, the first `cap` of them. */
-const areasOf = (byArea: AreaCounts, cap: number) =>
-  byArea.length <= cap ? counts(byArea) : list({ items: byArea.slice(0, cap), total: byArea.length }, ({ area, count }) => `${quote(area)} (${count})`, ', ', 'area');
 
 /** A read's block: where the file is, which of its symbols other areas use, and the rules that hold for it; none without either. */
 function readText({ mapAsOf, files: [read], rules }: z.infer<typeof FactsRead>): Omit<Block, 'moment' | 'repoPath'> | null {
@@ -118,8 +104,8 @@ function readText({ mapAsOf, files: [read], rules }: z.infer<typeof FactsRead>):
   const head = `ShadowGit's map (snapshot ${mapAsOf.snapshot.slice(0, 8)}, ${mapAsOf.time}): ${read.file} ${where}.`;
   const ruleLines = quoted.length === 0 ? [] : [`${quoted.length === 1 ? 'A rule holds' : `${quoted.length} rules hold`} for this file, quoted from .shadowgit-rules: ${quoted.join('; ')}.`];
   const attempt = (symbolCap: number, areaCap: number) => {
-    const shown = { items: used.items.slice(0, symbolCap), total: used.total };
-    const usedLine = `Used from other areas: ${list(shown, (symbol) => `${symbol.name} (line ${symbol.line}) by ${areasOf(symbol.byArea, areaCap)}`, '; ', 'symbol')}.`;
+    const shown = capped(used, symbolCap);
+    const usedLine = `Used from other areas: ${list(shown, (symbol) => `${symbol.name} (line ${symbol.line}) by ${capList(symbol.byArea, areaCap, areaCount, 'area')}`, '; ', 'symbol')}.`;
     return {
       text: [head, ...(used.total === 0 ? [] : [usedLine]), ...ruleLines].join('\n'),
       symbols: shown.items.length,
@@ -170,7 +156,7 @@ function symbolLines(symbol: Edited, fact: Fact, cap: number): { lines: string[]
 
 type Match = z.infer<typeof FactsEdit>['rules']['matches'][number];
 const matchText = ({ rule, count, links }: Match) =>
-  `It adds ${count === 1 ? 'a link' : `${count} links`} a rule names, quoted from .shadowgit-rules: ${ruleLine(rule)}: ${links.map(quote).join(', ')}${count > links.length ? ` …and ${count - links.length} more` : ''}.`;
+  `It adds ${count === 1 ? 'a link' : `${count} links`} a rule names, quoted from .shadowgit-rules: ${ruleLine(rule)}: ${list({ items: links, total: count }, quote)}.`;
 
 /** What a read file's facts say, once per agent and file. */
 async function readBlock(memory: FactsMemory, agent: string, file: string, aiTool: string): Promise<Block | null> {
@@ -178,8 +164,9 @@ async function readBlock(memory: FactsMemory, agent: string, file: string, aiToo
   if (located === null) return null;
   const key = ['read', agent, located.project.path, located.file].join('\0');
   if (memory.said.has(key)) return null;
-  // A project's first hook takes its baseline, a read's too: the edits that follow compare with it
-  const [facts] = await Promise.all([readFileFacts({ repoPath: located.project.path, aiTool, files: [located.file] }), baselineOf(memory, located.project.path)]);
+  // A project's first hook takes its baseline, a read's too, without waiting for it: the edits that follow compare with it
+  void baselineOf(memory, located.project.path);
+  const facts = await readFileFacts({ repoPath: located.project.path, aiTool, files: [located.file] });
   if (facts === null) return null;
   memory.said.add(key);
   const block = readText(facts);
@@ -191,7 +178,7 @@ async function readBlock(memory: FactsMemory, agent: string, file: string, aiToo
  * fact and its dependents, and the links it adds that a rule names, each said once per agent.
  */
 async function editBlock(memory: FactsMemory, agent: string, paths: readonly string[], aiTool: string): Promise<Block | null> {
-  const located = paths.map((each) => projectOfFile(each)).filter((each) => each !== null);
+  const located = paths.map(projectOfFile).filter((each) => each !== null);
   const [first] = located;
   if (first === undefined) return null;
   const repoPath = first.project.path;
@@ -215,7 +202,7 @@ async function editBlock(memory: FactsMemory, agent: string, paths: readonly str
     .slice(0, RULE_MATCHES);
   if (symbols.length === 0 && matches.length === 0) return null;
 
-  const named = files.length <= 3 ? andList(files) : list({ items: files.slice(0, 3), total: files.length }, (file) => file, ', ', 'file');
+  const named = capList(files, 3, (file) => file, 'file');
   const head = `ShadowGit's map: ${named} compared with snapshot ${facts.since.snapshot.slice(0, 8)}, the newest when this conversation began.`;
   const attempt = (symbolCap: number, dependentCap: number) => {
     const shown = symbols.slice(0, symbolCap);
@@ -232,23 +219,24 @@ async function editBlock(memory: FactsMemory, agent: string, paths: readonly str
 const EDIT_TOOLS = new Set(['Edit', 'Write', 'MultiEdit', 'apply_patch']);
 
 /** The block a hook's call asks for: a read's, an edit's (a file, or a Codex patch), or none after another tool. */
-function blockFor(memory: FactsMemory, input: HookArgs, aiTool: string): Promise<Block | null> {
+async function blockFor(memory: FactsMemory, input: HookArgs, aiTool: string): Promise<Block | null> {
   const agent = filled(input.agent) ?? '';
   const tool = filled(input.tool);
   const patch = filled(input.patch);
   const file = filled(input.file);
   if (patch !== undefined) return editBlock(memory, agent, patchPaths(patch), aiTool);
-  if (file === undefined || tool === undefined) return Promise.resolve(null);
+  if (file === undefined || tool === undefined) return null;
   if (tool === 'Read') return readBlock(memory, agent, file, aiTool);
-  return EDIT_TOOLS.has(tool) ? editBlock(memory, agent, [file], aiTool) : Promise.resolve(null);
+  return EDIT_TOOLS.has(tool) ? editBlock(memory, agent, [file], aiTool) : null;
 }
 
 const EMPTY: CallToolResult = { content: [{ type: 'text', text: '' }] };
 
 /**
  * A hook's answer: the facts of the file the assistant read or edited as the hook's JSON, or empty text when there is
- * nothing to say. Never an error for what is expected (the app closed or older, no project, no map yet); an error only
- * for a real failure, which the assistant shows as a hook error. Each block is recorded in the app by its counts.
+ * nothing to say. Never an error for what is expected (the app closed or older, no project, no map yet); a real failure
+ * throws, which the SDK answers as an error and the assistant shows as a hook error. Each block is recorded in the app
+ * by its counts.
  */
 export async function factsForHooks(memory: FactsMemory, input: HookArgs, aiTool: string): Promise<CallToolResult> {
   const started = performance.now();
@@ -261,8 +249,8 @@ export async function factsForHooks(memory: FactsMemory, input: HookArgs, aiTool
     return { content: [{ type: 'text', text: JSON.stringify(answer) }] };
   } catch (error) {
     // The app closed, or one before 0.7.0: the hook adds nothing, as it would without ShadowGit
-    if (error instanceof AppNotRunningError || (error instanceof Error && error.message === APP_WITHOUT_FACTS)) return EMPTY;
-    return { content: [{ type: 'text', text: error instanceof Error ? error.message : String(error) }], isError: true };
+    if (error instanceof AppNotRunningError || error instanceof AppWithoutRouteError) return EMPTY;
+    throw error;
   }
 }
 

@@ -10,7 +10,7 @@ import { RuleCheck, RulesFailure, RulesFor } from './rule-shapes.js';
 const UsedFrom = z.object({ name: z.string(), line: z.number().int(), byArea: z.array(AreaCount) });
 
 /** What the map says of a file the assistant read: off it, or its area and layer and which of its symbols other areas use. */
-export const ReadFacts = z.union([
+const ReadFacts = z.union([
   z.object({ file: z.string(), onMap: z.literal(false) }),
   z.object({ file: z.string(), onMap: z.literal(true), area: z.string(), layer: z.string().nullable(), usedFrom: listed(UsedFrom) }),
 ]);

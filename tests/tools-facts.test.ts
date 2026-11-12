@@ -3,7 +3,7 @@ import path from 'node:path';
 import { describe, it, expect, beforeAll, afterAll, beforeEach, afterEach, vi } from 'vitest';
 import type { CallToolResult } from '@modelcontextprotocol/server';
 import { createFactsMemory, factsForHooks, patchPaths, type FactsMemory } from '../src/tools/facts.js';
-import { MAP_ANSWERS, MAP_PROJECT, RULES_ANSWERS, closedAppUrl, startFakeApp, type FakeApp } from './helpers/fake-app.js';
+import { MAP_ANSWERS, MAP_PROJECT, RULES_ANSWERS, closedAppUrl, factsAnswers, startFakeApp, type FakeApp } from './helpers/fake-app.js';
 import { makeProject, removeTempDirs, restoreEnv, shadowGit, snapshot, tempDir, textOf, useStorage } from './helpers/fixtures.js';
 
 let project: string;
@@ -52,7 +52,7 @@ beforeEach(() => {
   app.requests.length = 0;
   app.factsRoutes = true;
   app.factsStatus = 200;
-  app.factsAnswer = { read: MAP_ANSWERS.factsRead, edit: MAP_ANSWERS.factsEdit };
+  app.factsAnswer = factsAnswers();
   memory = createFactsMemory();
 });
 
@@ -191,6 +191,8 @@ describe("facts_for_hooks finds each file's project", () => {
     const baseline = shadowGit(other, ['rev-parse', 'HEAD']);
     await factsForHooks(memory, { tool: 'Read', file: path.join(other, 'src/admin.ts') }, AI);
     expect(app.requestsTo('/map/facts').at(-1)).toEqual({ repoPath: other, aiTool: AI, moment: 'read', files: ['src/admin.ts'] });
+    // The read started the baseline without waiting for it: it is read before the next snapshot lands
+    await memory.baselines.get(other);
     snapshot(other, { 'src/admin.ts': 'export const admin = 2;\n' }, 'Later');
     await factsForHooks(memory, { tool: 'Edit', file: path.join(other, 'src/admin.ts') }, AI);
     expect(app.requestsTo('/map/facts').at(-1)).toMatchObject({ repoPath: other, since: baseline, files: ['src/admin.ts'] });
@@ -201,8 +203,7 @@ describe("facts_for_hooks finds each file's project", () => {
     useStorage([{ name: 'webshop', path: project }, { name: 'admin', path: other }, { name: 'flaky', path: flaky }]);
     const history = path.join(flaky, '.shadowgit.git');
     fs.renameSync(history, `${history}.away`);
-    const failed = await factsForHooks(memory, { tool: 'Edit', file: path.join(flaky, 'src/f.ts') }, AI);
-    expect(failed.isError).toBe(true);
+    await expect(factsForHooks(memory, { tool: 'Edit', file: path.join(flaky, 'src/f.ts') }, AI)).rejects.toThrow();
     fs.renameSync(`${history}.away`, history);
     await factsForHooks(memory, { tool: 'Edit', file: path.join(flaky, 'src/f.ts') }, AI);
     expect(app.requestsTo('/map/facts').at(-1)).toMatchObject({ repoPath: flaky, since: shadowGit(flaky, ['rev-parse', 'HEAD']) });
@@ -229,11 +230,9 @@ describe('facts_for_hooks when the app has nothing to say', () => {
     expect(context(await read('src/billing/charge.ts'))).toBeNull();
   });
 
-  it("answers the app's failure as an error", async () => {
+  it("fails with the app's failure, which the SDK answers as an error", async () => {
     app.factsStatus = 500;
-    const result = await read('src/billing/charge.ts');
-    expect(result.isError).toBe(true);
-    expect(textOf(result)).toBe('ShadowGit: The facts took longer than 4.5 s');
+    await expect(read('src/billing/charge.ts')).rejects.toThrow('ShadowGit: The facts took longer than 4.5 s');
   });
 
   it('says nothing after a tool the hooks do not follow', async () => {

@@ -7,7 +7,7 @@ import { CommentReply } from '../src/comment-shapes.js';
 import { DocsRead, DocsWritten } from '../src/doc-shapes.js';
 import { ContextRead, SummaryRead } from '../src/map-shapes.js';
 import {
-  COMMENT_ANSWERS, DOCS_ANSWERS, FAKE_CITED_LENS, FAKE_LENS, FAKE_LIMITS, FAKE_RANGE, LENS_ANSWER_WITH_FACTS, MAP_ANSWERS, RULES_ANSWERS, closedAppUrl, mapAnswers, startFakeApp, type FakeApp,
+  COMMENT_ANSWERS, DOCS_ANSWERS, FAKE_CITED_LENS, FAKE_LENS, FAKE_LIMITS, FAKE_RANGE, LENS_ANSWER_WITH_FACTS, MAP_ANSWERS, RULES_ANSWERS, closedAppUrl, factsAnswers, mapAnswers, startFakeApp, type FakeApp,
 } from './helpers/fake-app.js';
 import { restoreEnv } from './helpers/fixtures.js';
 
@@ -336,7 +336,7 @@ describe('the outline and the facts', () => {
     app.factsRoutes = true;
     app.outlineAnswer = MAP_ANSWERS.outline;
     app.outlineDelayMs = 0;
-    app.factsAnswer = { read: MAP_ANSWERS.factsRead, edit: MAP_ANSWERS.factsEdit };
+    app.factsAnswer = factsAnswers();
     app.factsStatus = 200;
   });
 

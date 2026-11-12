@@ -29,6 +29,16 @@ export function list<T>({ items, total }: Listed<T>, show: (item: T) => string, 
   return `${items.map(show).join(separator)} …and ${noun === undefined ? `${more} more` : plural(more, `more ${noun}`)}`;
 }
 
+/** The first `cap` of a capped list, and how many there are in all. */
+export const capped = <T>({ items, total }: Listed<T>, cap: number): Listed<T> => ({ items: items.slice(0, cap), total });
+
+/** Items as "a, b and c" while `cap` holds them all; past it, the first `cap` and how many more of `noun` there are. */
+export const capList = <T>(items: readonly T[], cap: number, show: (item: T) => string, noun: string) =>
+  items.length <= cap ? andList(items.map(show)) : list(capped({ items, total: items.length }, cap), show, ', ', noun);
+
+/** An error as the server's own line on stderr, where the client logs it. */
+export const report = (error: unknown) => process.stderr.write(`shadowgit-mcp-server: ${error instanceof Error ? error.message : String(error)}\n`);
+
 export const Snapshot = z.string().regex(/^[0-9a-f]{7,40}$/, 'a snapshot hash');
 
 /** A result with a sentence for the model and the same facts as structured data, checked against the tool's output schema. */

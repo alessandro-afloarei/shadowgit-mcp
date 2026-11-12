@@ -63,8 +63,8 @@ export interface FakeApp {
   outlineAnswer: object | null;
   /** How long GET /map/outline takes to answer. */
   outlineDelayMs: number;
-  /** What POST /map/facts answers with 200, for a read and for an edit. */
-  factsAnswer: { read: object; edit: object };
+  /** What POST /map/facts answers with 200, for an edit and for a read: one answer, or one by what was asked. */
+  factsAnswer: { read: object | ((asked: Record<string, unknown>) => object); edit: object };
   /** 200 answers factsAnswer; 202 is a map still drawing, 400 a since the history lacks, 409 no snapshot, 500 a failure. */
   factsStatus: 200 | 202 | 400 | 409 | 500;
   /** False, the default, is an app without the docs routes: they answer the catch-all 404. Off unless a test opts in, as its pages are the map webshop's alone. */
@@ -225,6 +225,7 @@ export const COMMENT_ANSWERS = {
 export const RULES_PROJECT = fixture('rules/project') as Record<string, string>;
 /** What the map routes answer by default: the summary, the billing area, and chargeCard's context. */
 export const mapAnswers = () => ({ map: MAP_ANSWERS.summary, area: MAP_ANSWERS.area, context: MAP_ANSWERS.context });
+export const factsAnswers = (): FakeApp['factsAnswer'] => ({ read: MAP_ANSWERS.factsRead, edit: MAP_ANSWERS.factsEdit });
 
 /** A stand-in for the ShadowGit app's Session API on an ephemeral port; points SHADOWGIT_SESSION_API at it. */
 export async function startFakeApp(): Promise<FakeApp> {
@@ -273,7 +274,7 @@ async function listen(): Promise<FakeApp> {
     factsRoutes: true,
     outlineAnswer: MAP_ANSWERS.outline,
     outlineDelayMs: 0,
-    factsAnswer: { read: MAP_ANSWERS.factsRead, edit: MAP_ANSWERS.factsEdit },
+    factsAnswer: factsAnswers(),
     factsStatus: 200,
     hang: false,
     hangBody: false,
@@ -388,7 +389,8 @@ async function listen(): Promise<FakeApp> {
     if (app.factsRoutes && route === '/map/facts/delivered') return json(200, { success: true });
     if (app.factsRoutes && route === '/map/facts') {
       if (app.factsStatus !== 200) return json(app.factsStatus, { success: false, error: FACTS_REFUSALS[app.factsStatus] });
-      return json(200, { success: true, ...(body.moment === 'edit' ? app.factsAnswer.edit : app.factsAnswer.read) });
+      const { read, edit } = app.factsAnswer;
+      return json(200, { success: true, ...(body.moment === 'edit' ? edit : typeof read === 'function' ? read(body) : read) });
     }
     if (app.mapRoutes && (route.startsWith('/map?') || route === '/map/context')) {
       if (app.mapStatus === 202) return json(202, { success: false, error: "ShadowGit is drawing this project's map; ask again in a minute" });

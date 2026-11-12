@@ -21,8 +21,7 @@ export const SymbolRef = z.object({
   layer: z.string(),
 });
 const UseRef = z.object({ symbol: SymbolRef, how: z.array(How) });
-/** Where a dependent uses what it depends on, as its file is on disk; or that its file changed since the map's snapshot. */
-export const Use = z
+const Use = z
   .union([z.object({ line: z.number().int(), text: z.string() }), z.object({ changedSince: z.literal(true) })])
   .describe("The line where it uses it, as its file is on disk, or that its file changed since the map's snapshot");
 // From an app with the map at work (0.7.0), a dependent symbol carries its use when the parser found it

@@ -41,9 +41,7 @@ let passed = 0;
 for (let i = 1; i <= RUNS; i++) {
   const app = await startFakeApp();
   // The read facts of charge.ts, which other areas use; any other file's say nothing
-  Object.defineProperty(app.factsAnswer, 'read', {
-    get: () => (JSON.stringify(app.requestsTo('/map/facts').at(-1) ?? {}).includes('src/billing/charge.ts') ? MAP_ANSWERS.factsRead : MAP_ANSWERS.factsReadQuiet),
-  });
+  app.factsAnswer.read = (asked) => (JSON.stringify(asked.files).includes('src/billing/charge.ts') ? MAP_ANSWERS.factsRead : MAP_ANSWERS.factsReadQuiet);
   app.mapAnswer.context = MAP_ANSWERS.contextLines;
   try {
     const project = makeProject('webshop', MAP_PROJECT, ago(2 * 24 * 60));
