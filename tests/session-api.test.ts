@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeAll, afterAll, afterEach, beforeEach, vi } from 'vitest';
 import {
-  APP_WITHOUT_COMMENTS, APP_WITHOUT_DOCS, AppNotRunningError, AppTimeoutError, LensRead, activeSessions, createCheckpoint, endSession, readArea, readCodeContext, readComments,
-  readDocs, readLens, readMap, replyToComment, sendDocs, sendLensWords, startSession,
+  APP_WITHOUT_COMMENTS, APP_WITHOUT_DOCS, APP_WITHOUT_FACTS, AppNotRunningError, AppTimeoutError, LensRead, activeSessions, createCheckpoint, endSession, readArea, readCodeContext,
+  readComments, readDocs, readEditFacts, readFileFacts, readLens, readMap, readOutline, replyToComment, sendDocs, sendFactsDelivered, sendLensWords, startSession,
 } from '../src/session-api.js';
 import { CommentReply } from '../src/comment-shapes.js';
 import { DocsRead, DocsWritten } from '../src/doc-shapes.js';
@@ -324,6 +324,84 @@ describe('the map', () => {
   it('says ShadowGit is not running when nothing answers', async () => {
     vi.stubEnv('SHADOWGIT_SESSION_API', await closedAppUrl());
     await expect(readMap(ask)).rejects.toBeInstanceOf(AppNotRunningError);
+  });
+});
+
+describe('the outline and the facts', () => {
+  const repoPath = '/projects/webshop';
+  const aiTool = 'Claude Code';
+
+  beforeEach(() => {
+    app.requests.length = 0;
+    app.factsRoutes = true;
+    app.outlineAnswer = MAP_ANSWERS.outline;
+    app.outlineDelayMs = 0;
+    app.factsAnswer = { read: MAP_ANSWERS.factsRead, edit: MAP_ANSWERS.factsEdit };
+    app.factsStatus = 200;
+  });
+
+  it("reads the project's outline from the map the app keeps, naming no assistant", async () => {
+    expect(await readOutline(repoPath)).toEqual(MAP_ANSWERS.outline);
+    expect(app.requests.at(-1)?.path).toBe(`/map/outline?${new URLSearchParams({ repoPath })}`);
+    app.outlineAnswer = RULES_ANSWERS.outline;
+    expect(await readOutline(repoPath)).toEqual(RULES_ANSWERS.outline);
+  });
+
+  it('reads no outline while the map draws, from an app without the route, past 300 ms, or with the app closed', async () => {
+    app.outlineAnswer = null;
+    expect(await readOutline(repoPath)).toBeNull();
+    app.outlineAnswer = MAP_ANSWERS.outline;
+    app.factsRoutes = false;
+    expect(await readOutline(repoPath)).toBeNull();
+    app.factsRoutes = true;
+    app.outlineDelayMs = 400;
+    expect(await readOutline(repoPath)).toBeNull();
+    vi.stubEnv('SHADOWGIT_SESSION_API', await closedAppUrl());
+    expect(await readOutline(repoPath)).toBeNull();
+  });
+
+  it.each([
+    ['read by other areas', MAP_ANSWERS.factsRead],
+    ['read by its own area', MAP_ANSWERS.factsReadQuiet],
+    ['a rule holds', RULES_ANSWERS.factsRead],
+  ] as const)("reads every field of a read's facts (%s), asking for its moment", async (_name, answer) => {
+    app.factsAnswer.read = answer;
+    expect(await readFileFacts({ repoPath, aiTool, files: ['src/billing/charge.ts'] })).toEqual(answer);
+    expect(app.requestsTo('/map/facts').at(-1)).toEqual({ repoPath, aiTool, moment: 'read', files: ['src/billing/charge.ts'] });
+  });
+
+  it.each([
+    ['a signature and a body', MAP_ANSWERS.factsEdit],
+    ['an import a rule names', RULES_ANSWERS.factsEdit],
+  ] as const)("reads every field of an edit's facts (%s), against its baseline", async (_name, answer) => {
+    app.factsAnswer.edit = answer;
+    const since = 'a'.repeat(40);
+    expect(await readEditFacts({ repoPath, aiTool, since, files: ['src/billing/charge.ts'] })).toEqual(answer);
+    expect(app.requestsTo('/map/facts').at(-1)).toEqual({ repoPath, aiTool, moment: 'edit', since, files: ['src/billing/charge.ts'] });
+  });
+
+  it("reads each dependent's use in the code context", async () => {
+    app.mapAnswer.context = MAP_ANSWERS.contextLines;
+    expect(await readCodeContext({ repoPath, aiTool, symbols: [{ name: 'chargeCard' }] })).toEqual(MAP_ANSWERS.contextLines);
+  });
+
+  it.each([202, 400, 409] as const)('reads no facts for a %i', async (status) => {
+    app.factsStatus = status;
+    expect(await readFileFacts({ repoPath, aiTool, files: ['src/billing/charge.ts'] })).toBeNull();
+    expect(await readEditFacts({ repoPath, aiTool, since: 'a'.repeat(40), files: ['src/billing/charge.ts'] })).toBeNull();
+  });
+
+  it("passes a 500 on in the app's words, and asks for an app update when the facts routes are missing", async () => {
+    app.factsStatus = 500;
+    await expect(readFileFacts({ repoPath, aiTool, files: ['src/billing/charge.ts'] })).rejects.toThrow('ShadowGit: The facts took longer than 4.5 s');
+    app.factsRoutes = false;
+    await expect(readEditFacts({ repoPath, aiTool, since: 'a'.repeat(40), files: ['src/billing/charge.ts'] })).rejects.toThrow(APP_WITHOUT_FACTS);
+  });
+
+  it('tells the app a block was delivered, by its counts', async () => {
+    const delivered = { repoPath, aiTool, moment: 'edit' as const, symbols: 2, dependents: 2, rules: 0, chars: 412, ms: 31 };
+    await sendFactsDelivered(delivered);
+    expect(app.requestsTo('/map/facts/delivered').at(-1)).toEqual(delivered);
   });
 });
 

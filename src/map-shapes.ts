@@ -10,7 +10,7 @@ import { RulesFailure, RulesFor, RulesRead } from './rule-shapes.js';
 export const listed = <T extends z.ZodType>(item: T) =>
   z.object({ items: z.array(item), total: z.number().int().describe('How many there are in all; items holds the first of them') });
 
-const AreaCount = z.object({ area: z.string(), count: z.number().int() });
+export const AreaCount = z.object({ area: z.string(), count: z.number().int() });
 const How = z.string().describe('calls, imports, extends, implements or overrides');
 export const SymbolRef = z.object({
   name: z.string(),
@@ -21,8 +21,13 @@ export const SymbolRef = z.object({
   layer: z.string(),
 });
 const UseRef = z.object({ symbol: SymbolRef, how: z.array(How) });
-const DependentRef = z.union([
-  UseRef,
+/** Where a dependent uses what it depends on, as its file is on disk; or that its file changed since the map's snapshot. */
+export const Use = z
+  .union([z.object({ line: z.number().int(), text: z.string() }), z.object({ changedSince: z.literal(true) })])
+  .describe("The line where it uses it, as its file is on disk, or that its file changed since the map's snapshot");
+// From an app with the map at work (0.7.0), a dependent symbol carries its use when the parser found it
+export const DependentRef = z.union([
+  UseRef.extend({ use: Use.optional() }),
   z.object({ file: z.string(), area: z.string(), how: z.array(How) }).describe('A file whose top-level code calls it, or that imports it'),
 ]);
 const DEPENDENTS =

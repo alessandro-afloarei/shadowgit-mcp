@@ -944,6 +944,42 @@
                                       "layer"
                                     ],
                                     "type": "object"
+                                  },
+                                  "use": {
+                                    "anyOf": [
+                                      {
+                                        "additionalProperties": false,
+                                        "properties": {
+                                          "line": {
+                                            "maximum": 9007199254740991,
+                                            "minimum": -9007199254740991,
+                                            "type": "integer"
+                                          },
+                                          "text": {
+                                            "type": "string"
+                                          }
+                                        },
+                                        "required": [
+                                          "line",
+                                          "text"
+                                        ],
+                                        "type": "object"
+                                      },
+                                      {
+                                        "additionalProperties": false,
+                                        "properties": {
+                                          "changedSince": {
+                                            "const": true,
+                                            "type": "boolean"
+                                          }
+                                        },
+                                        "required": [
+                                          "changedSince"
+                                        ],
+                                        "type": "object"
+                                      }
+                                    ],
+                                    "description": "The line where it uses it, as its file is on disk, or that its file changed since the map's snapshot"
                                   }
                                 },
                                 "required": [
@@ -1143,6 +1179,42 @@
                                         "layer"
                                       ],
                                       "type": "object"
+                                    },
+                                    "use": {
+                                      "anyOf": [
+                                        {
+                                          "additionalProperties": false,
+                                          "properties": {
+                                            "line": {
+                                              "maximum": 9007199254740991,
+                                              "minimum": -9007199254740991,
+                                              "type": "integer"
+                                            },
+                                            "text": {
+                                              "type": "string"
+                                            }
+                                          },
+                                          "required": [
+                                            "line",
+                                            "text"
+                                          ],
+                                          "type": "object"
+                                        },
+                                        {
+                                          "additionalProperties": false,
+                                          "properties": {
+                                            "changedSince": {
+                                              "const": true,
+                                              "type": "boolean"
+                                            }
+                                          },
+                                          "required": [
+                                            "changedSince"
+                                          ],
+                                          "type": "object"
+                                        }
+                                      ],
+                                      "description": "The line where it uses it, as its file is on disk, or that its file changed since the map's snapshot"
                                     }
                                   },
                                   "required": [
