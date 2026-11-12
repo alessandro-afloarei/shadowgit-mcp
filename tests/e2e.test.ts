@@ -1,8 +1,11 @@
+import path from 'node:path';
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import type { Client } from '@modelcontextprotocol/client';
-import { INSTRUCTIONS } from '../src/server.js';
+import { SummaryRead } from '../src/map-shapes.js';
+import { outlineText } from '../src/outline.js';
+import { INSTRUCTIONS, OUTLINE_BUDGET } from '../src/server.js';
 import { ERAS, connect } from './helpers/client.js';
-import { COMMENT_ANSWERS, FAKE_RANGE, fakeSession, startFakeApp, type FakeApp } from './helpers/fake-app.js';
+import { COMMENT_ANSWERS, FAKE_RANGE, MAP_ANSWERS, RULES_ANSWERS, closedAppUrl, fakeSession, startFakeApp, type FakeApp } from './helpers/fake-app.js';
 import { JUDGING, makeProject, removeTempDirs, restoreEnv, useStorage } from './helpers/fixtures.js';
 
 // The two protocol revisions put "$schema" in different places; key order is not content.
@@ -20,6 +23,8 @@ describe.each(ERAS)('protocol $era', ({ era, mode }) => {
     project = makeProject('demo', { 'a.txt': 'hello\n' });
     const storage = useStorage([{ name: 'demo', path: project }]);
     app = await startFakeApp();
+    // A map still drawing: the instructions as they are without the project's outline
+    app.outlineAnswer = null;
     client = await connect(mode, { SHADOWGIT_STORAGE_DIR: storage, SHADOWGIT_SESSION_API: app.url, CLAUDE_PROJECT_DIR: project });
   });
 
@@ -34,7 +39,8 @@ describe.each(ERAS)('protocol $era', ({ era, mode }) => {
     expect(client.getProtocolEra()).toBe(era === '2026-07-28' ? 'modern' : 'legacy');
   });
 
-  // Claude Code cuts a server's instructions at 2,048 characters: 1,800 leaves room
+  // Claude Code cuts a server's instructions at 4,096 characters, at 2,048 before v2.1.296: within 1,800, the static part
+  // reaches an older one whole, and the project's outline after it has the rest
   it('serves the instructions, within 1,800 characters', () => {
     expect(client.getInstructions()).toBe(INSTRUCTIONS);
     expect(INSTRUCTIONS.length).toBeLessThanOrEqual(1800);
@@ -42,9 +48,18 @@ describe.each(ERAS)('protocol $era', ({ era, mode }) => {
 
   it('asks for the code context before an edit, ahead of the session', () => {
     const line =
-      "Before your first edit in a tracked project, call get_code_context (load it with tool search if it is deferred) for the files or symbols you will change: it lists what depends on them across the project by area, callers grep misses included (top-level code, imports through re-exports), where the change lands, and the project's rules for them, from its .shadowgit-rules file, which say only what must not depend on what: add no link they name. get_map shows how the project is organised.";
+      "Before your first edit in a tracked project, call get_code_context for the files or symbols you will change: it lists what depends on them across the project by area, callers grep misses included (top-level code, imports through re-exports), where the change lands, and the project's rules for them, from its .shadowgit-rules file, which say only what must not depend on what: add no link they name. get_map shows how the project is organised.";
     expect(INSTRUCTIONS).toContain(line);
     expect(INSTRUCTIONS.indexOf(line)).toBeLessThan(INSTRUCTIONS.indexOf('start_session'));
+  });
+
+  // Claude Code defers MCP tools behind tool search: the one an agent needs before its first edit loads upfront
+  it('loads get_code_context upfront and leaves every other tool deferred', async () => {
+    const { tools } = await client.listTools();
+    expect(tools.filter((tool) => tool._meta?.['anthropic/alwaysLoad'] === true).map((tool) => tool.name)).toEqual(['get_code_context']);
+    expect(INSTRUCTIONS).not.toContain('tool search');
+    // Claude Code cuts an upfront tool's description at 4,096 characters
+    expect(tools.find((tool) => tool.name === 'get_code_context')?.description?.length).toBeLessThanOrEqual(4096);
   });
 
   it("sends the user's questions about a part of the project to get_docs, and describes the docs tools as facts", async () => {
@@ -174,11 +189,11 @@ describe.each(ERAS)('protocol $era', ({ era, mode }) => {
     expect(JSON.stringify(tools.map((tool) => tool.outputSchema))).not.toContain('prefixItems');
   });
 
-  it('lists the thirteen tools exactly as pinned', async () => {
+  it('lists the fourteen tools exactly as pinned', async () => {
     const { tools } = await client.listTools();
     expect(tools.map((t) => t.name)).toEqual([
       'list_repos', 'git_command', 'get_map', 'get_code_context', 'start_session', 'checkpoint', 'end_session', 'get_lens', 'write_lens_words', 'get_docs', 'write_docs',
-      'get_review_comments', 'reply_to_review_comment',
+      'get_review_comments', 'reply_to_review_comment', 'facts_for_hooks',
     ]);
     await expect(JSON.stringify(tools, sortKeys, 2)).toMatchFileSnapshot('__snapshots__/tool-list.json');
   });
@@ -223,9 +238,13 @@ describe.each(ERAS)('protocol $era', ({ era, mode }) => {
   });
 
   // The app says which assistant is connected from this header: every request a tool makes carries it
-  it('names its client on every request it makes', () => {
+  // But the outline: each server process reads it as it starts, before the client names itself, and the app counts it
+  // apart (a 2026-07-28 client starts the server twice)
+  it('names its client on every request it makes but the outline, read before the client names itself', () => {
     expect(app.requests.length).toBeGreaterThan(0);
-    expect(app.requests.filter((request) => request.client !== 'shadowgit-e2e').map((request) => request.path)).toEqual([]);
+    const unnamed = app.requests.filter((request) => request.client !== 'shadowgit-e2e');
+    expect(unnamed.length).toBeGreaterThan(0);
+    expect(unnamed).toEqual(unnamed.map(() => ({ path: `/map/outline?${new URLSearchParams({ project })}`, body: {}, client: null })));
   });
 
   it('sends linked pieces, a why and an excerpt as given', async () => {
@@ -261,5 +280,86 @@ describe.each(ERAS)('protocol $era', ({ era, mode }) => {
   it('returns a refused git command as a tool error', async () => {
     const result = await client.callTool({ name: 'git_command', arguments: { command: 'log --output=out.txt' } });
     expect(result.isError).toBe(true);
+  });
+});
+
+describe('the outline in the instructions', () => {
+  let app: FakeApp;
+  let env: Record<string, string>;
+
+  beforeAll(async () => {
+    const project = makeProject('webshop', { 'a.txt': 'hello\n' });
+    const storage = useStorage([{ name: 'webshop', path: project }]);
+    app = await startFakeApp();
+    env = { SHADOWGIT_STORAGE_DIR: storage, SHADOWGIT_SESSION_API: app.url, CLAUDE_PROJECT_DIR: project };
+  });
+
+  afterAll(async () => {
+    await app.close();
+    removeTempDirs();
+    restoreEnv();
+  });
+
+  /** The instructions a server started now answers its first message with. */
+  async function instructions(overrides: Record<string, string> = {}): Promise<string | undefined> {
+    const client = await connect(ERAS[0].mode, { ...env, ...overrides });
+    try {
+      return client.getInstructions();
+    } finally {
+      await client.close();
+    }
+  }
+
+  it("ends the instructions with the project's outline, read from the app as the server starts", async () => {
+    app.outlineAnswer = RULES_ANSWERS.outline;
+    const read = await instructions();
+    expect(read).toBe(`${INSTRUCTIONS}\n${outlineText('webshop', SummaryRead.parse(RULES_ANSWERS.outline), OUTLINE_BUDGET)}`);
+    expect(read?.length).toBeLessThanOrEqual(4_000);
+  });
+
+  it("gives today's instructions while the first map draws, from an app without the route, and with the app closed", async () => {
+    app.outlineAnswer = null;
+    expect(await instructions()).toBe(INSTRUCTIONS);
+    app.outlineAnswer = MAP_ANSWERS.outline;
+    app.factsRoutes = false;
+    expect(await instructions()).toBe(INSTRUCTIONS);
+    app.factsRoutes = true;
+    expect(await instructions({ SHADOWGIT_SESSION_API: await closedAppUrl() })).toBe(INSTRUCTIONS);
+  });
+
+  it("answers the first message within the outline's 300 ms when the app is slower", async () => {
+    app.outlineDelayMs = 2_000;
+    const started = performance.now();
+    try {
+      expect(await instructions()).toBe(INSTRUCTIONS);
+      expect(performance.now() - started).toBeLessThan(1_500);
+    } finally {
+      app.outlineDelayMs = 0;
+    }
+  });
+});
+
+// The hooks sit in the person's settings and fire in every session: with the app closed, Read and Edit work as before
+describe('the hooks with the app closed', () => {
+  afterAll(() => {
+    removeTempDirs();
+    restoreEnv();
+  });
+
+  it('answer a Read and an Edit with empty text, never an error, in either protocol revision', async () => {
+    const project = makeProject('webshop', { 'src/a.ts': 'export const a = 1;\n' });
+    const storage = useStorage([{ name: 'webshop', path: project }]);
+    for (const { era, mode } of ERAS) {
+      const client = await connect(mode, { SHADOWGIT_STORAGE_DIR: storage, SHADOWGIT_SESSION_API: await closedAppUrl(), CLAUDE_PROJECT_DIR: project });
+      try {
+        for (const tool of ['Read', 'Edit']) {
+          const result = await client.callTool({ name: 'facts_for_hooks', arguments: { event: 'PostToolUse', tool, file: path.join(project, 'src/a.ts'), agent: '${agent_id}' } });
+          expect(result.isError, `${era} ${tool}`).not.toBe(true);
+          expect(result.content, `${era} ${tool}`).toEqual([{ type: 'text', text: '' }]);
+        }
+      } finally {
+        await client.close();
+      }
+    }
   });
 });

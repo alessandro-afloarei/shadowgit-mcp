@@ -15,15 +15,16 @@ export const ago = (minutes: number) => new Date(Date.now() - minutes * 60_000).
 
 /**
  * `claude -p prompt` in the project, tracked as webshop, with this server alone pointed at `app`: its stdout, also
- * when it exits with an error, whose reason is in its output. `args` adds the tools, the output format and the budget.
+ * when it exits with an error, whose reason is in its output. `args` adds the tools, the output format and the budget;
+ * `settings` (hooks) goes in --settings as JSON, so no real config is read or written.
  */
-export async function runClaude({ prompt, project, app, args, timeoutMs }: { prompt: string; project: string; app: FakeApp; args: string[]; timeoutMs: number }): Promise<string> {
+export async function runClaude({ prompt, project, app, args, timeoutMs, settings }: { prompt: string; project: string; app: FakeApp; args: string[]; timeoutMs: number; settings?: object }): Promise<string> {
   const storage = useStorage([{ name: 'webshop', path: project }]);
   const config = path.join(tempDir('eval'), 'mcp.json');
   fs.writeFileSync(config, JSON.stringify({
     mcpServers: { shadowgit: { command: process.execPath, args: [BINARY], env: { SHADOWGIT_STORAGE_DIR: storage, SHADOWGIT_SESSION_API: app.url } } },
   }));
-  const claude = run('claude', ['-p', prompt, '--mcp-config', config, '--strict-mcp-config', '--no-session-persistence', ...args], {
+  const claude = run('claude', ['-p', prompt, '--mcp-config', config, '--strict-mcp-config', '--no-session-persistence', ...(settings === undefined ? [] : ['--settings', JSON.stringify(settings)]), ...args], {
     cwd: project,
     timeout: timeoutMs,
     killSignal: 'SIGKILL',

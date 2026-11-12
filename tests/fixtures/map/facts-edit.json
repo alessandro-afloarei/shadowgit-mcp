@@ -1,0 +1,106 @@
+{
+  "success": true,
+  "since": {
+    "snapshot": "c22ec9721ae210d50918d9594642d18af395854f",
+    "time": "2026-11-12T10:53:22+01:00"
+  },
+  "mapAsOf": {
+    "snapshot": "c22ec9721ae210d50918d9594642d18af395854f",
+    "time": "2026-11-12T10:53:22+01:00",
+    "behind": 0,
+    "changedFiles": {
+      "items": [],
+      "total": 0
+    }
+  },
+  "symbols": [
+    {
+      "key": "src/billing/charge.ts::chargeCard::function",
+      "name": "chargeCard",
+      "kind": "function",
+      "path": "src/billing/charge.ts",
+      "line": 5,
+      "baseLine": 5,
+      "delta": "modified",
+      "change": "code",
+      "signature": true,
+      "exported": true,
+      "wasExported": true,
+      "dependentCount": 2,
+      "dependentsByArea": [
+        {
+          "area": "api",
+          "count": 1
+        },
+        {
+          "area": "jobs",
+          "count": 1
+        }
+      ],
+      "dependents": {
+        "items": [
+          {
+            "symbol": {
+              "name": "checkout",
+              "kind": "function",
+              "file": "src/api/checkout.ts",
+              "line": 5,
+              "area": "api",
+              "layer": "api"
+            },
+            "how": [
+              "calls"
+            ],
+            "use": {
+              "line": 7,
+              "text": "return chargeCard(cartTotal(total));"
+            }
+          },
+          {
+            "symbol": {
+              "name": "retryFailedCharges",
+              "kind": "function",
+              "file": "src/jobs/retry.ts",
+              "line": 5,
+              "area": "jobs",
+              "layer": "jobs"
+            },
+            "how": [
+              "calls"
+            ],
+            "use": {
+              "changedSince": true
+            }
+          }
+        ],
+        "total": 2
+      }
+    },
+    {
+      "key": "src/billing/format.ts::formatAmount::function",
+      "name": "formatAmount",
+      "kind": "function",
+      "path": "src/billing/format.ts",
+      "line": 1,
+      "baseLine": 1,
+      "delta": "modified",
+      "change": "code",
+      "signature": false,
+      "exported": true,
+      "wasExported": true,
+      "dependentCount": 1,
+      "dependentsByArea": [
+        {
+          "area": "billing",
+          "count": 1
+        }
+      ]
+    }
+  ],
+  "rules": {
+    "rules": 0,
+    "matches": [],
+    "file": null
+  },
+  "skipped": []
+}

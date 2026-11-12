@@ -2,6 +2,7 @@ import * as z from 'zod/v4';
 import { CommentReply, CommentsRead } from './comment-shapes.js';
 import { DocsRead, DocsWritten, type DocKey, type DocsCursor, type DocWords } from './doc-shapes.js';
 import { AreaRead, ContextRead, SummaryRead } from './map-shapes.js';
+import { FactsEdit, FactsRead } from './fact-shapes.js';
 import { CheckpointRules, Range, RuleCheck, RulesFailure } from './rule-shapes.js';
 import { callingClient } from './client-name.js';
 import { toLocalIso } from './time.js';
@@ -15,6 +16,9 @@ export class AppNotRunningError extends Error {
     );
   }
 }
+
+/** An app older than the route: its message asks for an update. */
+export class AppWithoutRouteError extends Error {}
 
 /** No answer in time: the app may be busy rather than closed, and may still act on the request. */
 export class AppTimeoutError extends Error {
@@ -33,6 +37,7 @@ const APP_WITHOUT_LENS = 'This version of ShadowGit has no Lens for AI assistant
 const APP_WITHOUT_MAP = 'This version of ShadowGit has no map for AI assistants. Ask the user to update the ShadowGit app.';
 export const APP_WITHOUT_DOCS = 'This version of ShadowGit has no docs pages for AI assistants. Ask the user to update the ShadowGit app.';
 export const APP_WITHOUT_COMMENTS = 'This version of ShadowGit has no review comments for AI assistants. Ask the user to update the ShadowGit app.';
+export const APP_WITHOUT_FACTS = 'This version of ShadowGit has no facts for hooks. Ask the user to update the ShadowGit app.';
 // What every app answers a route it doesn't have
 const NO_ROUTE = 'Not found';
 const CHECK_UNREAD = "ShadowGit checked this saved snapshot against the project's rules and answered in a shape this version of shadowgit-mcp-server does not read. Ask the user to update shadowgit-mcp-server.";
@@ -174,7 +179,7 @@ async function request(
   // An app without the route answers 'Not found', or a page before 0.3.4; a route's own 404 gives its reason
   if (response.status === 404 && missing !== undefined) {
     const reply = ErrorReply.safeParse(json);
-    if (!reply.success || reply.data.error === NO_ROUTE) throw new Error(missing);
+    if (!reply.success || reply.data.error === NO_ROUTE) throw new AppWithoutRouteError(missing);
   }
   if (response.status !== 200 && !accept.includes(response.status)) throw failure(response.status, json);
   return { status: response.status, json };
@@ -275,6 +280,57 @@ export function readArea({ repoPath, area, aiTool }: { repoPath: string; area: s
 /** Where files and symbols sit and what depends on them; the app may draw the map in the request. */
 export function readCodeContext(input: { repoPath: string; files?: string[]; symbols?: { name: string; file?: string }[]; aiTool: string }) {
   return mapAnswer(ContextRead, '/map/context', input);
+}
+
+// The outline is read before the server answers initialize: past this, the assistant starts with today's instructions
+const OUTLINE_TIMEOUT_MS = 300;
+// Under the hooks' 5 s, and past the 4.5 s the app answers facts within, so the app's own failure arrives first
+const FACTS_TIMEOUT_MS = 4_800;
+
+/**
+ * The project's outline, from the map the app keeps, for the server's instructions: null with no answer within 300 ms,
+ * while the first map draws, or from an app without the route. It names no assistant: none has connected yet.
+ */
+export async function readOutline(repoPath: string): Promise<z.infer<typeof SummaryRead> | null> {
+  // `project`, never `repoPath`: an app before 0.7.0 reads any request naming repoPath as the assistant at work
+  const answer = await request(`/map/outline?${new URLSearchParams({ project: repoPath })}`, undefined, { timeoutMs: OUTLINE_TIMEOUT_MS, accept: [202, 400, 404, 409, 500] }).catch((error: unknown) => {
+    if (error instanceof AppNotRunningError || error instanceof AppTimeoutError) return null;
+    throw error;
+  });
+  return answer?.status === 200 ? read(SummaryRead, answer.json, 'map') : null;
+}
+
+/** A facts answer; null for what a hook says nothing about: a map still drawing, no snapshot, a request the app refuses. */
+async function factsAnswer<S extends z.ZodType>(shape: S, body: object): Promise<z.infer<S> | null> {
+  const { status, json } = await request('/map/facts', body, { timeoutMs: FACTS_TIMEOUT_MS, accept: [202, 400, 409], missing: APP_WITHOUT_FACTS });
+  return status === 200 ? read(shape, json, 'map') : null;
+}
+
+/** What the map says of files the assistant read. */
+export function readFileFacts(input: { repoPath: string; aiTool: string; files: string[] }): Promise<z.infer<typeof FactsRead> | null> {
+  return factsAnswer(FactsRead, { ...input, moment: 'read' });
+}
+
+/** What an edit changed in files against the conversation's baseline (`since`), and what depends on it on the map. */
+export function readEditFacts(input: { repoPath: string; aiTool: string; since: string; files: string[] }): Promise<z.infer<typeof FactsEdit> | null> {
+  return factsAnswer(FactsEdit, { ...input, moment: 'edit' });
+}
+
+/** A block of facts that reached the assistant, by its counts alone. */
+export interface FactsDelivered {
+  readonly repoPath: string;
+  readonly aiTool: string;
+  readonly moment: 'read' | 'edit';
+  readonly symbols: number;
+  readonly dependents: number;
+  readonly rules: number;
+  readonly chars: number;
+  readonly ms: number;
+}
+
+/** Tells the app a block of facts reached the assistant. */
+export async function sendFactsDelivered(input: FactsDelivered): Promise<void> {
+  await request('/map/facts/delivered', input);
 }
 
 /** A page's words as the app keeps them, or holds: the words it has still hold, kept again at the new head. */

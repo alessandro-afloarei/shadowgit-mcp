@@ -44,13 +44,31 @@ export function readRepos(): Repo[] {
  * must not fall back to another project's history.
  */
 export function currentRepo(repos: Repo[]): Repo | null {
-  const start = canonical(startDir());
-  const containing = repos
-    .map((repo) => ({ repo, root: canonical(repo.path) }))
-    .filter(({ root }) => isInside(start, root))
-    .sort((a, b) => b.root.length - a.root.length)[0];
+  const containing = deepestContaining(repos, canonical(startDir()));
   if (containing) return containing.repo;
   return repos.length === 1 && !process.env.CLAUDE_PROJECT_DIR ? (repos[0] ?? null) : null;
+}
+
+/**
+ * The tracked project holding a file, and the file's path in it as the app names it (with `/`); null in none. By real
+ * paths, the deepest project first, as for the current project; a relative path is from the client's project directory.
+ * The file's folder is resolved, not the file, which an edit may have deleted.
+ */
+export function projectOfFile(file: string): { project: Repo; file: string } | null {
+  const full = path.resolve(startDir(), file);
+  const real = path.join(canonical(path.dirname(full)), path.basename(full));
+  const containing = deepestContaining(readRepos(), real);
+  if (!containing) return null;
+  const relative = path.relative(containing.root, real);
+  return relative === '' ? null : { project: containing.repo, file: relative.split(path.sep).join('/') };
+}
+
+/** The deepest of `repos` whose real path holds `real`, with that path. */
+function deepestContaining(repos: Repo[], real: string): { repo: Repo; root: string } | undefined {
+  return repos
+    .map((repo) => ({ repo, root: canonical(repo.path) }))
+    .filter(({ root }) => isInside(real, root))
+    .sort((a, b) => b.root.length - a.root.length)[0];
 }
 
 export function resolveRepo(repo?: string): Repo {

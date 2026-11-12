@@ -1,0 +1,40 @@
+{
+  "success": true,
+  "mapAsOf": {
+    "snapshot": "c22ec9721ae210d50918d9594642d18af395854f",
+    "time": "2026-11-12T10:53:22+01:00",
+    "behind": 0,
+    "changedFiles": {
+      "items": [],
+      "total": 0
+    }
+  },
+  "files": [
+    {
+      "file": "src/billing/charge.ts",
+      "onMap": true,
+      "area": "billing",
+      "layer": "billing",
+      "usedFrom": {
+        "items": [
+          {
+            "name": "chargeCard",
+            "line": 5,
+            "byArea": [
+              {
+                "area": "api",
+                "count": 1
+              },
+              {
+                "area": "jobs",
+                "count": 1
+              }
+            ]
+          }
+        ],
+        "total": 1
+      }
+    }
+  ],
+  "rules": null
+}

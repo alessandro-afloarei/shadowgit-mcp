@@ -102,7 +102,7 @@ describe('get_code_context', () => {
     expect(text).toContain("From webshop's map, drawn from snapshot 9db22aff");
     expect(text).toContain('chargeCard (function, src/billing/charge.ts:5): area "billing", layer billing.');
     expect(text).toContain('Uses: recordPayment (src/billing/ledger.ts:3, calls), roundCents (src/billing/money.ts:1, calls).');
-    expect(text).toContain('2 depend on chargeCard, from "api" (1) and "jobs" (1): checkout (src/api/checkout.ts:5, calls), retryFailedCharges (src/jobs/retry.ts:5, calls).');
+    expect(text).toContain('2 depend on chargeCard, from "api" (1) and "jobs" (1):\n- checkout (src/api/checkout.ts:5, calls)\n- retryFailedCharges (src/jobs/retry.ts:5, calls)\n');
     expect(text).toContain('Reach within 3 hops: 4 symbols in 5 files (2, 1 and 1 by hop), from "api" (4) and "jobs" (1).');
     expect(text).toContain('Processes: StartServer -> RoundCents, StartServer -> RecordPayment');
   });
@@ -135,7 +135,20 @@ describe('get_code_context', () => {
     app.mapAnswer.context = MAP_ANSWERS.landing;
     const text = textOf(await getCodeContext({ symbols: [{ name: 'chargeCard' }, { name: 'checkout' }] }, 'Claude Code'));
     expect(text).toContain('Where they land: "api" (1) and "billing" (1).');
-    expect(text).toContain('2 depend on them from outside, from "api" (1) and "jobs" (1): route (src/api/router.ts:4, calls), retryFailedCharges (src/jobs/retry.ts:5, calls).');
+    expect(text).toContain('2 depend on them from outside, from "api" (1) and "jobs" (1):\n- route (src/api/router.ts:4, calls)\n- retryFailedCharges (src/jobs/retry.ts:5, calls)\n');
+  });
+
+  it('lists each dependent with the line where it uses the target, quoted as the file holds it', async () => {
+    app.mapAnswer.context = MAP_ANSWERS.contextLines;
+    const text = textOf(await getCodeContext({ symbols: [{ name: 'chargeCard' }] }, 'Claude Code'));
+    expect(text).toContain('- checkout (src/api/checkout.ts:5, calls), line 7: "return chargeCard(cartTotal(total));"');
+    expect(text).toContain('- retryFailedCharges (src/jobs/retry.ts:5, calls), line 6: "return amounts.reduce((sum, amount, attempt) => sum + chargeCard(amount) + backoff(attempt), 0);"');
+  });
+
+  it("says a dependent's file changed since the map's snapshot, in place of its line", async () => {
+    app.mapAnswer.context = JSON.parse(JSON.stringify(MAP_ANSWERS.contextLines).replace(/"use":\{"line":6,"text":"[^"]*"\}/, '"use":{"changedSince":true}')) as object;
+    const text = textOf(await getCodeContext({ symbols: [{ name: 'chargeCard' }] }, 'Claude Code'));
+    expect(text).toContain("- retryFailedCharges (src/jobs/retry.ts:5, calls): its file changed since the map's snapshot");
   });
 
   it('lists the matches of an ambiguous name and says why a target is not on the map, guessing none', async () => {

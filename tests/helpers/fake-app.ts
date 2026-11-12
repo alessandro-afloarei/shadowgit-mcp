@@ -57,6 +57,16 @@ export interface FakeApp {
   mapStatus: 200 | 202 | 409 | 500;
   /** The bodies the map routes answer: GET /map without an area, with one, and POST /map/context. */
   mapAnswer: { map: object; area: object; context: object };
+  /** False is an app before 0.7.0, without the outline and facts routes: they answer the catch-all 404. */
+  factsRoutes: boolean;
+  /** What GET /map/outline answers; null is a map still drawing (202). */
+  outlineAnswer: object | null;
+  /** How long GET /map/outline takes to answer. */
+  outlineDelayMs: number;
+  /** What POST /map/facts answers with 200, for an edit and for a read: one answer, or one by what was asked. */
+  factsAnswer: { read: object | ((asked: Record<string, unknown>) => object); edit: object };
+  /** 200 answers factsAnswer; 202 is a map still drawing, 400 a since the history lacks, 409 no snapshot, 500 a failure. */
+  factsStatus: 200 | 202 | 400 | 409 | 500;
   /** False, the default, is an app without the docs routes: they answer the catch-all 404. Off unless a test opts in, as its pages are the map webshop's alone. */
   docsRoutes: boolean;
   /** 200 answers; 202 is an app still counting past its deadline, for a read, or still reading the map's names, for a write. */
@@ -107,6 +117,14 @@ export const FAKE_CITED_LENS = {
   })),
 };
 
+/** The app's own words for each facts status but 200. */
+const FACTS_REFUSALS = {
+  202: "ShadowGit is drawing this project's map; ask again in a minute",
+  400: 'since is not a snapshot of this project: deadbeef',
+  409: 'This project has no snapshot yet',
+  500: 'The facts took longer than 4.5 s',
+} as const;
+
 const fixture = (name: string): Record<string, unknown> => JSON.parse(readFileSync(new URL(`../fixtures/${name}.json`, import.meta.url), 'utf8')) as Record<string, unknown>;
 // Without the success the app sends beside each answer: the map routes add it, as the Lens route does
 const withoutSuccess = (answer: Record<string, unknown>): object => {
@@ -125,6 +143,13 @@ export const MAP_ANSWERS = {
   landing: mapFixture('landing'),
   unresolved: mapFixture('unresolved'),
   file: mapFixture('file'),
+  // From an app with the map at work (0.7.0): the outline, the facts of a read of charge.ts and of format.ts (used from its
+  // own area alone), an edit that changes chargeCard's signature and formatAmount's body, and chargeCard's context with lines
+  outline: mapFixture('outline'),
+  factsRead: mapFixture('facts-read'),
+  factsReadQuiet: mapFixture('facts-read-quiet'),
+  factsEdit: mapFixture('facts-edit'),
+  contextLines: mapFixture('context-lines'),
   // The Lens eval's project: checkout, its file and a file not written yet, and its summary
   checkoutSymbol: mapFixture('checkout-symbol'),
   checkoutFiles: mapFixture('checkout-files'),
@@ -154,6 +179,11 @@ export const RULES_ANSWERS = {
   checkpoint: fixture('rules/checkpoint'),
   lens: fixture('rules/lens'),
   rulesOnly: fixture('rules/rules-only'),
+  // From an app with the map at work (0.7.0): the outline with the rule, a read of report.ts, which the rule holds for, and an
+  // edit that makes report.ts import api's countActiveUsers
+  outline: withoutSuccess(fixture('rules/outline')),
+  factsRead: withoutSuccess(fixture('rules/facts-read')),
+  factsEdit: withoutSuccess(fixture('rules/facts-edit')),
 };
 /**
  * The real app's docs answers for the map webshop (`tests/fixtures/map/project.json`), from a session that adds
@@ -195,6 +225,7 @@ export const COMMENT_ANSWERS = {
 export const RULES_PROJECT = fixture('rules/project') as Record<string, string>;
 /** What the map routes answer by default: the summary, the billing area, and chargeCard's context. */
 export const mapAnswers = () => ({ map: MAP_ANSWERS.summary, area: MAP_ANSWERS.area, context: MAP_ANSWERS.context });
+export const factsAnswers = (): FakeApp['factsAnswer'] => ({ read: MAP_ANSWERS.factsRead, edit: MAP_ANSWERS.factsEdit });
 
 /** A stand-in for the ShadowGit app's Session API on an ephemeral port; points SHADOWGIT_SESSION_API at it. */
 export async function startFakeApp(): Promise<FakeApp> {
@@ -240,6 +271,11 @@ async function listen(): Promise<FakeApp> {
     mapRoutes: true,
     mapStatus: 200,
     mapAnswer: mapAnswers(),
+    factsRoutes: true,
+    outlineAnswer: MAP_ANSWERS.outline,
+    outlineDelayMs: 0,
+    factsAnswer: factsAnswers(),
+    factsStatus: 200,
     hang: false,
     hangBody: false,
     close: () => {
@@ -344,6 +380,17 @@ async function listen(): Promise<FakeApp> {
         })),
       };
       return json(200, { success: true, reply });
+    }
+    if (app.factsRoutes && route.startsWith('/map/outline?')) {
+      await new Promise((resolve) => setTimeout(resolve, app.outlineDelayMs));
+      if (app.outlineAnswer === null) return json(202, { success: false, error: "ShadowGit is drawing this project's map; ask again in a minute" });
+      return json(200, { success: true, ...app.outlineAnswer });
+    }
+    if (app.factsRoutes && route === '/map/facts/delivered') return json(200, { success: true });
+    if (app.factsRoutes && route === '/map/facts') {
+      if (app.factsStatus !== 200) return json(app.factsStatus, { success: false, error: FACTS_REFUSALS[app.factsStatus] });
+      const { read, edit } = app.factsAnswer;
+      return json(200, { success: true, ...(body.moment === 'edit' ? edit : typeof read === 'function' ? read(body) : read) });
     }
     if (app.mapRoutes && (route.startsWith('/map?') || route === '/map/context')) {
       if (app.mapStatus === 202) return json(202, { success: false, error: "ShadowGit is drawing this project's map; ask again in a minute" });

@@ -19,7 +19,7 @@ export const snapshots = ({ base, head }: z.infer<typeof Range>) => `${base === 
 export const passing = ({ base, head }: z.infer<typeof Range>) => `passing base ${JSON.stringify(base)} and head ${JSON.stringify(head)}`;
 
 /** The rule as written, quoted, then its reason. */
-const ruleLine = ({ text, because }: z.infer<typeof Rule>) => `${quote(text)}${because === null ? '' : ` because ${quote(because)}`}`;
+export const ruleLine = ({ text, because }: z.infer<typeof Rule>) => `${quote(text)}${because === null ? '' : ` because ${quote(because)}`}`;
 
 /** Why the project's rules couldn't be read. */
 const failureLine = (failure: string) => `The project's rules (.shadowgit-rules) could not be read: ${quote(failure)}`;

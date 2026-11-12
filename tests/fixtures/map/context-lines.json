@@ -1,0 +1,145 @@
+{
+  "success": true,
+  "mapAsOf": {
+    "snapshot": "c22ec9721ae210d50918d9594642d18af395854f",
+    "time": "2026-11-12T10:53:22+01:00",
+    "behind": 0,
+    "changedFiles": {
+      "items": [],
+      "total": 0
+    }
+  },
+  "context": {
+    "targets": [
+      {
+        "kind": "symbol",
+        "target": "chargeCard",
+        "symbol": {
+          "name": "chargeCard",
+          "kind": "function",
+          "file": "src/billing/charge.ts",
+          "line": 5,
+          "area": "billing",
+          "layer": "billing"
+        },
+        "uses": {
+          "items": [
+            {
+              "symbol": {
+                "name": "recordPayment",
+                "kind": "function",
+                "file": "src/billing/ledger.ts",
+                "line": 3,
+                "area": "billing",
+                "layer": "billing"
+              },
+              "how": [
+                "calls"
+              ]
+            },
+            {
+              "symbol": {
+                "name": "roundCents",
+                "kind": "function",
+                "file": "src/billing/money.ts",
+                "line": 1,
+                "area": "billing",
+                "layer": "billing"
+              },
+              "how": [
+                "calls"
+              ]
+            }
+          ],
+          "total": 2
+        },
+        "usesByArea": [
+          {
+            "area": "billing",
+            "count": 2
+          }
+        ],
+        "dependents": {
+          "items": [
+            {
+              "symbol": {
+                "name": "checkout",
+                "kind": "function",
+                "file": "src/api/checkout.ts",
+                "line": 5,
+                "area": "api",
+                "layer": "api"
+              },
+              "how": [
+                "calls"
+              ],
+              "use": {
+                "line": 7,
+                "text": "return chargeCard(cartTotal(total));"
+              }
+            },
+            {
+              "symbol": {
+                "name": "retryFailedCharges",
+                "kind": "function",
+                "file": "src/jobs/retry.ts",
+                "line": 5,
+                "area": "jobs",
+                "layer": "jobs"
+              },
+              "how": [
+                "calls"
+              ],
+              "use": {
+                "line": 6,
+                "text": "return amounts.reduce((sum, amount, attempt) => sum + chargeCard(amount) + backoff(attempt), 0);"
+              }
+            }
+          ],
+          "total": 2
+        },
+        "dependentsByArea": [
+          {
+            "area": "api",
+            "count": 1
+          },
+          {
+            "area": "jobs",
+            "count": 1
+          }
+        ],
+        "reach": {
+          "byHop": [
+            2,
+            1,
+            1
+          ],
+          "symbols": 4,
+          "files": 5,
+          "byArea": [
+            {
+              "area": "api",
+              "count": 4
+            },
+            {
+              "area": "jobs",
+              "count": 1
+            }
+          ]
+        },
+        "processes": {
+          "items": [
+            "StartServer -> RoundCents",
+            "StartServer -> RecordPayment",
+            "RetryFailedCharges -> RoundCents",
+            "RetryFailedCharges -> RecordPayment"
+          ],
+          "total": 4
+        }
+      }
+    ],
+    "landing": null
+  },
+  "rules": null,
+  "docs": []
+}
