@@ -27,6 +27,7 @@
     "eval:rules": "npm run build && tsx scripts/eval-rules.ts",
     "eval:docs": "npm run build && tsx scripts/eval-docs.ts",
     "eval:comments": "npm run build && tsx scripts/eval-comments.ts",
+    "eval:facts": "npm run build && tsx scripts/eval-facts.ts",
     "prepublishOnly": "npm run typecheck && npm run lint && npm test"
   },
   "keywords": [
