@@ -17,11 +17,11 @@ function outlineLines(repo: string, { mapAsOf, summary, rules }: Outline, scale:
   const lists = [
     summary.areas.total > 0 && `Areas: ${list(capped(summary.areas, cap(12)), (area) => `${quote(area.label)} (${plural(area.files, 'file')})`, ', ', 'area')}.`,
     summary.links.total > 0 && `Most links: ${list(capped(summary.links, cap(8)), (link) => `${quote(link.from)} → ${quote(link.to)} (${link.count} calls and imports)`, ', ', 'link')}.`,
-    summary.processes.total > 0 && `Processes: ${list(capped(summary.processes, cap(6)), (process) => `${process.label}: ${process.areas.map(quote).join(' → ')}`, '; ', 'process')}.`,
+    summary.processes.total > 0 && `Processes: ${list(capped(summary.processes, cap(6)), (process) => `${quote(process.label)}: ${process.areas.map(quote).join(' → ')}`, '; ', 'process')}.`,
     rules && rules.rules.length > 0 && `Rules, quoted from .shadowgit-rules: ${list(capped({ items: rules.rules, total: rules.rules.length }, cap(8)), ruleLine, '; ', 'rule')}.`,
   ].filter((line) => typeof line === 'string');
   return {
-    head: `This project, ${repo}, on ShadowGit's map (snapshot ${mapAsOf.snapshot.slice(0, 8)}, ${mapAsOf.time}): ${plural(files, 'file')}, ${plural(areas, 'area')}, ${plural(summary.layers.length, 'layer')}.`,
+    head: `This project, ${quote(repo)}, on ShadowGit's map (snapshot ${mapAsOf.snapshot.slice(0, 8)}, ${mapAsOf.time}): ${plural(files, 'file')}, ${plural(areas, 'area')}, ${plural(summary.layers.length, 'layer')}.`,
     lists,
     tail: 'get_map and get_docs read more.',
   };
@@ -29,8 +29,9 @@ function outlineLines(repo: string, { mapAsOf, summary, rules }: Outline, scale:
 
 /**
  * The project's outline as the instructions end with it: where it is on the map, its areas, the links between them,
- * its processes and its rules. Over `budget` characters, every list's cap is halved until it fits; the head and the
- * tail always stay.
+ * its processes and its rules. Every name from the project is quoted, as text, not as instructions: the instructions
+ * are what the model trusts most. Over `budget` characters, every list's cap is halved until it fits; the head and
+ * the tail always stay.
  */
 export function outlineText(repo: string, read: Outline, budget: number): string {
   for (const scale of [1, 1 / 2, 1 / 4, 1 / 8]) {

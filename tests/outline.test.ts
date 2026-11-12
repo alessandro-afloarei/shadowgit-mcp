@@ -5,7 +5,7 @@ import { MAP_ANSWERS, RULES_ANSWERS } from './helpers/fake-app.js';
 
 const map = SummaryRead.parse(MAP_ANSWERS.outline);
 const rules = SummaryRead.parse(RULES_ANSWERS.outline);
-const FIRST = "This project, webshop, on ShadowGit's map (snapshot c22ec972, 2026-11-12T10:53:22+01:00): 19 files, 3 areas, 3 layers.";
+const FIRST = 'This project, "webshop", on ShadowGit\'s map (snapshot c22ec972, 2026-11-12T10:53:22+01:00): 19 files, 3 areas, 3 layers.';
 const LAST = 'get_map and get_docs read more.';
 
 describe("the project's outline in the instructions", () => {
@@ -14,7 +14,7 @@ describe("the project's outline in the instructions", () => {
       FIRST,
       'Areas: "api" (8 files), "billing" (6 files), "jobs" (5 files).',
       'Most links: "api" → "billing" (3 calls and imports), "jobs" → "billing" (3 calls and imports).',
-      'Processes: StartServer -> RoundCents: "api" → "billing"; StartServer -> RecordPayment: "api" → "billing"; StartServer -> Shipping: "api"; InvoiceLine -> RoundCents: "billing"; CleanupCarts -> MaxDelay: "jobs"; StartServer -> ValidateCart: "api" …and 7 more processes.',
+      'Processes: "StartServer -> RoundCents": "api" → "billing"; "StartServer -> RecordPayment": "api" → "billing"; "StartServer -> Shipping": "api"; "InvoiceLine -> RoundCents": "billing"; "CleanupCarts -> MaxDelay": "jobs"; "StartServer -> ValidateCart": "api" …and 7 more processes.',
       LAST,
     ]);
   });
