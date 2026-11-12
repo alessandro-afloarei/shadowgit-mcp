@@ -1,0 +1,43 @@
+{
+  "success": true,
+  "mapAsOf": {
+    "snapshot": "f52ee00645b7b6c9d2517387956bbb7c638597c5",
+    "time": "2026-11-12T10:53:24+01:00",
+    "behind": 0,
+    "changedFiles": {
+      "items": [],
+      "total": 0
+    }
+  },
+  "files": [
+    {
+      "file": "src/jobs/report.ts",
+      "onMap": true,
+      "area": "jobs",
+      "layer": "jobs",
+      "usedFrom": {
+        "items": [],
+        "total": 0
+      }
+    }
+  ],
+  "rules": [
+    {
+      "rule": {
+        "line": 2,
+        "text": "src/jobs never depends on src/api",
+        "form": "never",
+        "from": [
+          "src/jobs"
+        ],
+        "to": [
+          "src/api"
+        ],
+        "because": "jobs read the database through src/db"
+      },
+      "files": [
+        "src/jobs/report.ts"
+      ]
+    }
+  ]
+}
