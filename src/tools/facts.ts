@@ -29,8 +29,10 @@ const HookInput = z.object({
 });
 type HookArgs = z.infer<typeof HookInput>;
 
-/** A value the hook filled in: none for nothing, or for a placeholder it couldn't fill (`${agent_id}` in the main thread). */
-const filled = (value: string | null | undefined) => (value === null || value === undefined || value === '' || value.includes('${') ? undefined : value);
+/** A whole value the hook left as written: a placeholder it couldn't fill (`${agent_id}` in the main thread). */
+const PLACEHOLDER = /^\$\{[^}]*\}$/;
+/** A value the hook filled in: none for nothing or a placeholder; a patch's own `${…}` is code, and stays. */
+const filled = (value: string | null | undefined) => (value === null || value === undefined || value === '' || PLACEHOLDER.test(value) ? undefined : value);
 
 type Baseline = { ok: true; snapshot: string | null } | { ok: false; error: string };
 
@@ -49,11 +51,17 @@ async function newestSnapshot(projectPath: string): Promise<Baseline> {
   return { ok: true, snapshot: result.exitCode === 0 ? result.stdout.trim() : null };
 }
 
-/** A project's baseline: its newest snapshot when the server first needed it, which never moves after. */
+/**
+ * A project's baseline: its newest snapshot when the server first needed it, which never moves after. A failure is
+ * read again at the next hook: one slow or failed git must not fail every edit of the conversation.
+ */
 function baselineOf(memory: FactsMemory, projectPath: string): Promise<Baseline> {
   const known = memory.baselines.get(projectPath);
   if (known !== undefined) return known;
-  const reading = newestSnapshot(projectPath);
+  const reading = newestSnapshot(projectPath).then((baseline) => {
+    if (!baseline.ok) memory.baselines.delete(projectPath);
+    return baseline;
+  });
   memory.baselines.set(projectPath, reading);
   return reading;
 }
@@ -170,7 +178,8 @@ async function readBlock(memory: FactsMemory, agent: string, file: string, aiToo
   if (located === null) return null;
   const key = ['read', agent, located.project.path, located.file].join('\0');
   if (memory.said.has(key)) return null;
-  const facts = await readFileFacts({ repoPath: located.project.path, aiTool, files: [located.file] });
+  // A project's first hook takes its baseline, a read's too: the edits that follow compare with it
+  const [facts] = await Promise.all([readFileFacts({ repoPath: located.project.path, aiTool, files: [located.file] }), baselineOf(memory, located.project.path)]);
   if (facts === null) return null;
   memory.said.add(key);
   const block = readText(facts);

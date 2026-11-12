@@ -244,7 +244,7 @@ describe.each(ERAS)('protocol $era', ({ era, mode }) => {
     expect(app.requests.length).toBeGreaterThan(0);
     const unnamed = app.requests.filter((request) => request.client !== 'shadowgit-e2e');
     expect(unnamed.length).toBeGreaterThan(0);
-    expect(unnamed).toEqual(unnamed.map(() => ({ path: `/map/outline?${new URLSearchParams({ repoPath: project })}`, body: {}, client: null })));
+    expect(unnamed).toEqual(unnamed.map(() => ({ path: `/map/outline?${new URLSearchParams({ project })}`, body: {}, client: null })));
   });
 
   it('sends linked pieces, a why and an excerpt as given', async () => {

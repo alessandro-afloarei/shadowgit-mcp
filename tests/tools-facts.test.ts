@@ -166,6 +166,12 @@ describe('facts_for_hooks after an edit', () => {
     expect(patchPaths(patch)).toEqual(['src/a.ts', 'src/old.ts', 'src/new.ts', 'src/b.ts', 'src/c.ts']);
   });
 
+  it('answers a Codex patch whose code holds ${…}, which only a whole placeholder value is not', async () => {
+    const patch = ['*** Begin Patch', '*** Update File: src/billing/charge.ts', '@@', '+  const label = `${cents} EUR`;', '*** End Patch'].join('\n');
+    expect(context(await factsForHooks(memory, { event: 'PostToolUse', tool: 'apply_patch', patch, agent: '${agent_id}' }, 'Codex'))).not.toBeNull();
+    expect(app.requestsTo('/map/facts').at(-1)).toMatchObject({ files: ['src/billing/charge.ts'] });
+  });
+
   it("answers a Codex patch with the facts of its files, in the project of its first path", async () => {
     const patch = ['*** Begin Patch', '*** Update File: src/billing/charge.ts', '*** Delete File: src/billing/format.ts', `*** Update File: ${path.join(other, 'src/admin.ts')}`, '*** End Patch'].join('\n');
     expect(context(await factsForHooks(memory, { event: 'PostToolUse', tool: 'apply_patch', patch }, 'Codex'))).toContain('- chargeCard (line 5): its signature changed.');
@@ -181,10 +187,26 @@ describe("facts_for_hooks finds each file's project", () => {
     expect(app.requestsTo('/map/facts').at(-1)).toMatchObject({ repoPath: project, files: ['src/billing/charge.ts'] });
   });
 
-  it("in a second tracked project, against that project's own baseline", async () => {
+  it("in a second tracked project, read and edited against that project's own baseline, taken at its first hook", async () => {
     const baseline = shadowGit(other, ['rev-parse', 'HEAD']);
+    await factsForHooks(memory, { tool: 'Read', file: path.join(other, 'src/admin.ts') }, AI);
+    expect(app.requestsTo('/map/facts').at(-1)).toEqual({ repoPath: other, aiTool: AI, moment: 'read', files: ['src/admin.ts'] });
+    snapshot(other, { 'src/admin.ts': 'export const admin = 2;\n' }, 'Later');
     await factsForHooks(memory, { tool: 'Edit', file: path.join(other, 'src/admin.ts') }, AI);
     expect(app.requestsTo('/map/facts').at(-1)).toMatchObject({ repoPath: other, since: baseline, files: ['src/admin.ts'] });
+  });
+
+  it('reads a baseline again after git failed to read it', async () => {
+    const flaky = makeProject('flaky', { 'src/f.ts': 'export const f = 1;\n' });
+    useStorage([{ name: 'webshop', path: project }, { name: 'admin', path: other }, { name: 'flaky', path: flaky }]);
+    const history = path.join(flaky, '.shadowgit.git');
+    fs.renameSync(history, `${history}.away`);
+    const failed = await factsForHooks(memory, { tool: 'Edit', file: path.join(flaky, 'src/f.ts') }, AI);
+    expect(failed.isError).toBe(true);
+    fs.renameSync(`${history}.away`, history);
+    await factsForHooks(memory, { tool: 'Edit', file: path.join(flaky, 'src/f.ts') }, AI);
+    expect(app.requestsTo('/map/facts').at(-1)).toMatchObject({ repoPath: flaky, since: shadowGit(flaky, ['rev-parse', 'HEAD']) });
+    useStorage([{ name: 'webshop', path: project }, { name: 'admin', path: other }]);
   });
 
   it('and says nothing, asking nothing, for a file in no tracked project', async () => {

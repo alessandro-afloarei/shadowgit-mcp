@@ -289,7 +289,8 @@ const FACTS_TIMEOUT_MS = 4_800;
  * while the first map draws, or from an app without the route. It names no assistant: none has connected yet.
  */
 export async function readOutline(repoPath: string): Promise<z.infer<typeof SummaryRead> | null> {
-  const answer = await request(`/map/outline?${new URLSearchParams({ repoPath })}`, undefined, { timeoutMs: OUTLINE_TIMEOUT_MS, accept: [202, 400, 404, 409, 500] }).catch((error: unknown) => {
+  // `project`, never `repoPath`: an app before 0.7.0 reads any request naming repoPath as the assistant at work
+  const answer = await request(`/map/outline?${new URLSearchParams({ project: repoPath })}`, undefined, { timeoutMs: OUTLINE_TIMEOUT_MS, accept: [202, 400, 404, 409, 500] }).catch((error: unknown) => {
     if (error instanceof AppNotRunningError || error instanceof AppTimeoutError) return null;
     throw error;
   });

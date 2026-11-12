@@ -342,7 +342,8 @@ describe('the outline and the facts', () => {
 
   it("reads the project's outline from the map the app keeps, naming no assistant", async () => {
     expect(await readOutline(repoPath)).toEqual(MAP_ANSWERS.outline);
-    expect(app.requests.at(-1)?.path).toBe(`/map/outline?${new URLSearchParams({ repoPath })}`);
+    // `project`, never `repoPath`: an app before 0.7.0 reads any request naming repoPath as the assistant at work
+    expect(app.requests.at(-1)?.path).toBe(`/map/outline?${new URLSearchParams({ project: repoPath })}`);
     app.outlineAnswer = RULES_ANSWERS.outline;
     expect(await readOutline(repoPath)).toEqual(RULES_ANSWERS.outline);
   });
