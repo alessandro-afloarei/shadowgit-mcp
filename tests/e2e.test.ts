@@ -1,8 +1,10 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import type { Client } from '@modelcontextprotocol/client';
-import { INSTRUCTIONS } from '../src/server.js';
+import { SummaryRead } from '../src/map-shapes.js';
+import { outlineText } from '../src/outline.js';
+import { INSTRUCTIONS, OUTLINE_BUDGET } from '../src/server.js';
 import { ERAS, connect } from './helpers/client.js';
-import { COMMENT_ANSWERS, FAKE_RANGE, fakeSession, startFakeApp, type FakeApp } from './helpers/fake-app.js';
+import { COMMENT_ANSWERS, FAKE_RANGE, MAP_ANSWERS, RULES_ANSWERS, closedAppUrl, fakeSession, startFakeApp, type FakeApp } from './helpers/fake-app.js';
 import { JUDGING, makeProject, removeTempDirs, restoreEnv, useStorage } from './helpers/fixtures.js';
 
 // The two protocol revisions put "$schema" in different places; key order is not content.
@@ -20,6 +22,8 @@ describe.each(ERAS)('protocol $era', ({ era, mode }) => {
     project = makeProject('demo', { 'a.txt': 'hello\n' });
     const storage = useStorage([{ name: 'demo', path: project }]);
     app = await startFakeApp();
+    // A map still drawing: the instructions as they are without the project's outline
+    app.outlineAnswer = null;
     client = await connect(mode, { SHADOWGIT_STORAGE_DIR: storage, SHADOWGIT_SESSION_API: app.url, CLAUDE_PROJECT_DIR: project });
   });
 
@@ -34,7 +38,8 @@ describe.each(ERAS)('protocol $era', ({ era, mode }) => {
     expect(client.getProtocolEra()).toBe(era === '2026-07-28' ? 'modern' : 'legacy');
   });
 
-  // Claude Code cuts a server's instructions at 2,048 characters: 1,800 leaves room
+  // Claude Code cuts a server's instructions at 4,096 characters, at 2,048 before v2.1.296: within 1,800, the static part
+  // reaches an older one whole, and the project's outline after it has the rest
   it('serves the instructions, within 1,800 characters', () => {
     expect(client.getInstructions()).toBe(INSTRUCTIONS);
     expect(INSTRUCTIONS.length).toBeLessThanOrEqual(1800);
@@ -232,9 +237,13 @@ describe.each(ERAS)('protocol $era', ({ era, mode }) => {
   });
 
   // The app says which assistant is connected from this header: every request a tool makes carries it
-  it('names its client on every request it makes', () => {
+  // But the outline: each server process reads it as it starts, before the client names itself, and the app counts it
+  // apart (a 2026-07-28 client starts the server twice)
+  it('names its client on every request it makes but the outline, read before the client names itself', () => {
     expect(app.requests.length).toBeGreaterThan(0);
-    expect(app.requests.filter((request) => request.client !== 'shadowgit-e2e').map((request) => request.path)).toEqual([]);
+    const unnamed = app.requests.filter((request) => request.client !== 'shadowgit-e2e');
+    expect(unnamed.length).toBeGreaterThan(0);
+    expect(unnamed).toEqual(unnamed.map(() => ({ path: `/map/outline?${new URLSearchParams({ repoPath: project })}`, body: {}, client: null })));
   });
 
   it('sends linked pieces, a why and an excerpt as given', async () => {
@@ -270,5 +279,61 @@ describe.each(ERAS)('protocol $era', ({ era, mode }) => {
   it('returns a refused git command as a tool error', async () => {
     const result = await client.callTool({ name: 'git_command', arguments: { command: 'log --output=out.txt' } });
     expect(result.isError).toBe(true);
+  });
+});
+
+describe('the outline in the instructions', () => {
+  let app: FakeApp;
+  let env: Record<string, string>;
+
+  beforeAll(async () => {
+    const project = makeProject('webshop', { 'a.txt': 'hello\n' });
+    const storage = useStorage([{ name: 'webshop', path: project }]);
+    app = await startFakeApp();
+    env = { SHADOWGIT_STORAGE_DIR: storage, SHADOWGIT_SESSION_API: app.url, CLAUDE_PROJECT_DIR: project };
+  });
+
+  afterAll(async () => {
+    await app.close();
+    removeTempDirs();
+    restoreEnv();
+  });
+
+  /** The instructions a server started now answers its first message with. */
+  async function instructions(overrides: Record<string, string> = {}): Promise<string | undefined> {
+    const client = await connect(ERAS[0].mode, { ...env, ...overrides });
+    try {
+      return client.getInstructions();
+    } finally {
+      await client.close();
+    }
+  }
+
+  it("ends the instructions with the project's outline, read from the app as the server starts", async () => {
+    app.outlineAnswer = RULES_ANSWERS.outline;
+    const read = await instructions();
+    expect(read).toBe(`${INSTRUCTIONS}\n${outlineText('webshop', SummaryRead.parse(RULES_ANSWERS.outline), OUTLINE_BUDGET)}`);
+    expect(read?.length).toBeLessThanOrEqual(4_000);
+  });
+
+  it("gives today's instructions while the first map draws, from an app without the route, and with the app closed", async () => {
+    app.outlineAnswer = null;
+    expect(await instructions()).toBe(INSTRUCTIONS);
+    app.outlineAnswer = MAP_ANSWERS.outline;
+    app.factsRoutes = false;
+    expect(await instructions()).toBe(INSTRUCTIONS);
+    app.factsRoutes = true;
+    expect(await instructions({ SHADOWGIT_SESSION_API: await closedAppUrl() })).toBe(INSTRUCTIONS);
+  });
+
+  it("answers the first message within the outline's 300 ms when the app is slower", async () => {
+    app.outlineDelayMs = 2_000;
+    const started = performance.now();
+    try {
+      expect(await instructions()).toBe(INSTRUCTIONS);
+      expect(performance.now() - started).toBeLessThan(1_500);
+    } finally {
+      app.outlineDelayMs = 0;
+    }
   });
 });

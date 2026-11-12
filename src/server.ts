@@ -23,10 +23,14 @@ export const INSTRUCTIONS = [
   "Every tool defaults to the project you are working in; pass repo only for another project. Older snapshot titles may give UTC times; git's dates are right.",
 ].join('\n');
 
-export function buildServer(): McpServer {
+// Claude Code cuts a server's instructions at 4,096 characters: the project's outline after them keeps within 4,000
+export const OUTLINE_BUDGET = 4_000 - INSTRUCTIONS.length - 1;
+
+/** The server, its instructions ending with the project's outline when there is one. */
+export function buildServer(outline: string | null = null): McpServer {
   const server = new McpServer(
     { name: 'shadowgit', title: 'ShadowGit', version: VERSION, websiteUrl: 'https://shadowgit.com' },
-    { instructions: INSTRUCTIONS },
+    { instructions: outline === null ? INSTRUCTIONS : `${INSTRUCTIONS}\n${outline}` },
   );
   registerListRepos(server);
   registerGitCommand(server);
