@@ -42,9 +42,18 @@ describe.each(ERAS)('protocol $era', ({ era, mode }) => {
 
   it('asks for the code context before an edit, ahead of the session', () => {
     const line =
-      "Before your first edit in a tracked project, call get_code_context (load it with tool search if it is deferred) for the files or symbols you will change: it lists what depends on them across the project by area, callers grep misses included (top-level code, imports through re-exports), where the change lands, and the project's rules for them, from its .shadowgit-rules file, which say only what must not depend on what: add no link they name. get_map shows how the project is organised.";
+      "Before your first edit in a tracked project, call get_code_context for the files or symbols you will change: it lists what depends on them across the project by area, callers grep misses included (top-level code, imports through re-exports), where the change lands, and the project's rules for them, from its .shadowgit-rules file, which say only what must not depend on what: add no link they name. get_map shows how the project is organised.";
     expect(INSTRUCTIONS).toContain(line);
     expect(INSTRUCTIONS.indexOf(line)).toBeLessThan(INSTRUCTIONS.indexOf('start_session'));
+  });
+
+  // Claude Code defers MCP tools behind tool search: the one an agent needs before its first edit loads upfront
+  it('loads get_code_context upfront and leaves every other tool deferred', async () => {
+    const { tools } = await client.listTools();
+    expect(tools.filter((tool) => tool._meta?.['anthropic/alwaysLoad'] === true).map((tool) => tool.name)).toEqual(['get_code_context']);
+    expect(INSTRUCTIONS).not.toContain('tool search');
+    // Claude Code cuts an upfront tool's description at 4,096 characters
+    expect(tools.find((tool) => tool.name === 'get_code_context')?.description?.length).toBeLessThanOrEqual(4096);
   });
 
   it("sends the user's questions about a part of the project to get_docs, and describes the docs tools as facts", async () => {
