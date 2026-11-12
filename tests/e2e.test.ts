@@ -1,3 +1,4 @@
+import path from 'node:path';
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import type { Client } from '@modelcontextprotocol/client';
 import { SummaryRead } from '../src/map-shapes.js';
@@ -188,11 +189,11 @@ describe.each(ERAS)('protocol $era', ({ era, mode }) => {
     expect(JSON.stringify(tools.map((tool) => tool.outputSchema))).not.toContain('prefixItems');
   });
 
-  it('lists the thirteen tools exactly as pinned', async () => {
+  it('lists the fourteen tools exactly as pinned', async () => {
     const { tools } = await client.listTools();
     expect(tools.map((t) => t.name)).toEqual([
       'list_repos', 'git_command', 'get_map', 'get_code_context', 'start_session', 'checkpoint', 'end_session', 'get_lens', 'write_lens_words', 'get_docs', 'write_docs',
-      'get_review_comments', 'reply_to_review_comment',
+      'get_review_comments', 'reply_to_review_comment', 'facts_for_hooks',
     ]);
     await expect(JSON.stringify(tools, sortKeys, 2)).toMatchFileSnapshot('__snapshots__/tool-list.json');
   });
@@ -334,6 +335,31 @@ describe('the outline in the instructions', () => {
       expect(performance.now() - started).toBeLessThan(1_500);
     } finally {
       app.outlineDelayMs = 0;
+    }
+  });
+});
+
+// The hooks sit in the person's settings and fire in every session: with the app closed, Read and Edit work as before
+describe('the hooks with the app closed', () => {
+  afterAll(() => {
+    removeTempDirs();
+    restoreEnv();
+  });
+
+  it('answer a Read and an Edit with empty text, never an error, in either protocol revision', async () => {
+    const project = makeProject('webshop', { 'src/a.ts': 'export const a = 1;\n' });
+    const storage = useStorage([{ name: 'webshop', path: project }]);
+    for (const { era, mode } of ERAS) {
+      const client = await connect(mode, { SHADOWGIT_STORAGE_DIR: storage, SHADOWGIT_SESSION_API: await closedAppUrl(), CLAUDE_PROJECT_DIR: project });
+      try {
+        for (const tool of ['Read', 'Edit']) {
+          const result = await client.callTool({ name: 'facts_for_hooks', arguments: { event: 'PostToolUse', tool, file: path.join(project, 'src/a.ts'), agent: '${agent_id}' } });
+          expect(result.isError, `${era} ${tool}`).not.toBe(true);
+          expect(result.content, `${era} ${tool}`).toEqual([{ type: 'text', text: '' }]);
+        }
+      } finally {
+        await client.close();
+      }
     }
   });
 });

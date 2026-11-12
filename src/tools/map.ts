@@ -24,7 +24,7 @@ type SymbolTarget = Extract<Target, { kind: 'symbol' }>;
 type Ref = SymbolTarget['dependents']['items'][number];
 
 /** Areas by label, each quoted: a label may hold ": " and commas ("lib: part0, part1 and 2 more"). */
-const counts = (byArea: readonly { area: string; count: number }[]) => andList(byArea.map(({ area, count }) => `${quote(area)} (${count})`));
+export const counts = (byArea: readonly { area: string; count: number }[]) => andList(byArea.map(({ area, count }) => `${quote(area)} (${count})`));
 /** What uses or depends on a target, and how: a symbol at its line, or a file. */
 const ref = (used: Ref) => ('symbol' in used ? `${used.symbol.name} (${used.symbol.file}:${used.symbol.line}, ${andList(used.how)})` : `${used.file} (${andList(used.how)})`);
 /** A dependent, with the line where it uses the target as its file is on disk, or that the file changed since the map's snapshot. */

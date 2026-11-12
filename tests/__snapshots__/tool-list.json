@@ -4885,5 +4885,57 @@
       "type": "object"
     },
     "title": "Reply to a review comment"
+  },
+  {
+    "annotations": {
+      "destructiveHint": false,
+      "idempotentHint": false,
+      "openWorldHint": false,
+      "readOnlyHint": true
+    },
+    "description": "Answers ShadowGit's Read and Edit hooks, which call it after the assistant reads or changes a file in a ShadowGit-tracked project: what ShadowGit's map says of that file, as the hook's JSON, or nothing. For questions about code, call get_code_context instead.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "properties": {
+        "agent": {
+          "description": "The subagent it ran in; none in the main thread",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "event": {
+          "description": "The hook's event",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "file": {
+          "description": "The file that tool read or changed",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "patch": {
+          "description": "Codex's apply_patch text",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "tool": {
+          "description": "The tool the hook followed: Read, Edit, Write or apply_patch",
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "type": "object"
+    },
+    "name": "facts_for_hooks",
+    "title": "Answer ShadowGit's hooks"
   }
 ]

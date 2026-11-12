@@ -3,6 +3,7 @@ import { registerCheckpoint } from './tools/checkpoint.js';
 import { registerComments } from './tools/comments.js';
 import { registerDocs } from './tools/docs.js';
 import { registerEndSession } from './tools/end-session.js';
+import { registerFacts } from './tools/facts.js';
 import { registerGitCommand } from './tools/git-command.js';
 import { registerLens } from './tools/lens.js';
 import { registerListRepos } from './tools/list-repos.js';
@@ -41,5 +42,6 @@ export function buildServer(outline: string | null = null): McpServer {
   registerLens(server);
   registerDocs(server);
   registerComments(server);
+  registerFacts(server);
   return server;
 }
