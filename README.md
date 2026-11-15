@@ -63,15 +63,17 @@ webshop") when ShadowGit tracks more than one.
 With ShadowGit 0.7.0 or later, your assistant gets the map's facts at three moments, with no step of its own:
 
 1. **As a session starts**, the project's outline is in the server's instructions: its areas, the heaviest links between
-   them, its processes and its rules, in up to about 2,200 characters.
+   them, its processes and its rules, in up to about 2,200 characters. The server reads it once, as it starts: with the
+   app closed or the map not drawn yet, that session goes without it.
 2. **After it reads a file** (Claude Code), when other areas use the file's code or a rule holds for it: the file's area
    and layer, which of its symbols other areas use, and those rules.
 3. **After it edits a file** (Claude Code and Codex): what changed in the file since the conversation began, for each
-   symbol something depends on. Where the change can break callers, each dependent comes with the line where it uses
-   the symbol; otherwise, how many depend on it and from where.
+   symbol something depends on. Where the change can break callers, its dependents come with the line where each uses
+   the symbol, where the map has one; otherwise, how many depend on it and from where. A summary of up to about 2,000
+   characters: at most six symbols and eight dependents each, and `get_code_context` lists the rest.
 
-The first needs nothing. Each dependent in `get_code_context`'s answer also comes with the line where it uses the code,
-and in Claude Code the tool loads with the first prompt. The other two come through hooks in your assistant's settings
+The first needs nothing. The dependents in `get_code_context`'s answer also come with the line where they use the code,
+where the map has one, and in Claude Code the tool loads with the first prompt. The other two come through hooks in your assistant's settings
 that call `facts_for_hooks`: turn them on in ShadowGit, beside your connected assistant in Get started or in Settings ›
 Integrations, with "Show it the map as it reads and edits". They are off by default: a benchmark of 690 runs found no
 help from them, slightly lower if anything (see the [CHANGELOG](CHANGELOG.md#2110---2026-11-15)). The facts come from
