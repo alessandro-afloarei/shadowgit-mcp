@@ -63,22 +63,24 @@ webshop") when ShadowGit tracks more than one.
 With ShadowGit 0.7.0 or later, your assistant gets the map's facts at three moments, with no step of its own:
 
 1. **As a session starts**, the project's outline is in the server's instructions: its areas, the heaviest links between
-   them, its processes and its rules, about 1,500 characters.
+   them, its processes and its rules, in up to about 2,200 characters.
 2. **After it reads a file** (Claude Code), when other areas use the file's code or a rule holds for it: the file's area
    and layer, which of its symbols other areas use, and those rules.
-3. **After it edits a file** (Claude Code and Codex): what changed in the file since the conversation began, symbol by
-   symbol, and each dependent with the line where it uses the symbol.
+3. **After it edits a file** (Claude Code and Codex): what changed in the file since the conversation began, for each
+   symbol something depends on. Where the change can break callers, each dependent comes with the line where it uses
+   the symbol; otherwise, how many depend on it and from where.
 
-The first needs nothing. In Claude Code, `get_code_context` also loads with the first prompt, and each dependent in its
-answer comes with the line where it uses the code. The other two come through hooks in your assistant's settings that
-call `facts_for_hooks`: turn them on in ShadowGit, under Connect, with "Show it the map as it reads and edits". They are
-off by default. A benchmark of 690 runs found them harmless at the same cost, not helpful: see the
-[CHANGELOG](CHANGELOG.md#2110---2026-11-15). Nothing leaves your computer, and when there is nothing to say (the app
-closed, a project ShadowGit doesn't track, a fact already said) your assistant gets nothing extra.
+The first needs nothing. Each dependent in `get_code_context`'s answer also comes with the line where it uses the code,
+and in Claude Code the tool loads with the first prompt. The other two come through hooks in your assistant's settings
+that call `facts_for_hooks`: turn them on in ShadowGit, beside your connected assistant in Get started or in Settings ›
+Integrations, with "Show it the map as it reads and edits". They are off by default: a benchmark of 690 runs found no
+help from them, slightly lower if anything (see the [CHANGELOG](CHANGELOG.md#2110---2026-11-15)). The facts come from
+the map on your computer and go to your AI provider like any file your assistant reads. When there is nothing to say
+(the app closed, a project ShadowGit doesn't track, a fact already said), your assistant gets nothing extra.
 
 The hooks, as ShadowGit writes them, if you set them up by hand:
 
-```json
+```jsonc
 // Claude Code, ~/.claude/settings.json (Claude Code 2.1.118 or later)
 { "hooks": { "PostToolUse": [ { "matcher": "Read|Edit|Write", "hooks": [ {
   "type": "mcp_tool", "server": "shadowgit", "tool": "facts_for_hooks", "timeout": 5,
@@ -93,7 +95,8 @@ The hooks, as ShadowGit writes them, if you set them up by hand:
 ```
 
 The hooks sit in your user settings, so they run in every session. In one where the `shadowgit` server isn't connected
-(it was removed, turned off in `/mcp`, or hasn't started yet), Claude Code shows a "hook error" notice and goes on. Turn
+(it was removed, turned off in `/mcp`, or hasn't started yet), or when the app doesn't answer in time, Claude Code shows
+a "hook error" notice and goes on. Turn
 the hooks off in ShadowGit to remove them.
 
 ## Tools
