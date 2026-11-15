@@ -1,6 +1,6 @@
 # ShadowGit MCP server
 
-Gives Claude Code, Cursor and Claude Desktop access to [ShadowGit](https://shadowgit.com): the automatic snapshots
+Gives Claude Code, Codex, Cursor and Claude Desktop access to [ShadowGit](https://shadowgit.com): the automatic snapshots
 ShadowGit takes of your projects every few minutes, kept apart from your own git history. Your assistant can see what
 changed and when, and can save its own edits as one snapshot with a title instead of many partial ones.
 
@@ -11,7 +11,8 @@ changed and when, and can save its own edits as one snapshot with a title instea
   linked words, after 0.3.9 for the map, after 0.3.10 for the Lens's dependency facts, 0.3.11 or later for the
   project's rules, 0.3.13 or later for a session's unsaved edits in a snapshot as it ends and for the check of a saved
   snapshot that finds nothing new, 0.4.0 or later for review comments and the docs pages of any change, a release
-  after 0.4.0 for area ids and for where a session is reviewed), tracking at least one project.
+  after 0.4.0 for area ids and for where a session is reviewed, 0.7.0 or later for the project's outline, dependents'
+  lines and the facts as your assistant reads and edits), tracking at least one project.
   Reading history works while the app is closed;
   sessions, saved snapshots, the Lens, the map and review comments need it running.
 - Git on your PATH
@@ -22,6 +23,12 @@ changed and when, and can save its own edits as one snapshot with a title instea
 
 ```bash
 claude mcp add --scope user shadowgit -- npx -y shadowgit-mcp-server
+```
+
+**Codex**:
+
+```bash
+codex mcp add shadowgit -- npx -y shadowgit-mcp-server
 ```
 
 **Cursor**: in `~/.cursor/mcp.json`:
@@ -51,6 +58,44 @@ webshop") when ShadowGit tracks more than one.
 - "Document this project in ShadowGit"
 - "Address my ShadowGit review comments"
 
+## As your assistant reads and edits
+
+With ShadowGit 0.7.0 or later, your assistant gets the map's facts at three moments, with no step of its own:
+
+1. **As a session starts**, the project's outline is in the server's instructions: its areas, the heaviest links between
+   them, its processes and its rules, about 1,500 characters.
+2. **After it reads a file** (Claude Code), when other areas use the file's code or a rule holds for it: the file's area
+   and layer, which of its symbols other areas use, and those rules.
+3. **After it edits a file** (Claude Code and Codex): what changed in the file since the conversation began, symbol by
+   symbol, and each dependent with the line where it uses the symbol.
+
+The first needs nothing. In Claude Code, `get_code_context` also loads with the first prompt, and each dependent in its
+answer comes with the line where it uses the code. The other two come through hooks in your assistant's settings that
+call `facts_for_hooks`: turn them on in ShadowGit, under Connect, with "Show it the map as it reads and edits". They are
+off by default. A benchmark of 690 runs found them harmless at the same cost, not helpful: see the
+[CHANGELOG](CHANGELOG.md#2110---2026-11-15). Nothing leaves your computer, and when there is nothing to say (the app
+closed, a project ShadowGit doesn't track, a fact already said) your assistant gets nothing extra.
+
+The hooks, as ShadowGit writes them, if you set them up by hand:
+
+```json
+// Claude Code, ~/.claude/settings.json (Claude Code 2.1.118 or later)
+{ "hooks": { "PostToolUse": [ { "matcher": "Read|Edit|Write", "hooks": [ {
+  "type": "mcp_tool", "server": "shadowgit", "tool": "facts_for_hooks", "timeout": 5,
+  "input": { "event": "${hook_event_name}", "tool": "${tool_name}", "file": "${tool_input.file_path}", "agent": "${agent_id}" }
+} ] } ] } }
+
+// Codex, ~/.codex/hooks.json (Codex 0.149.0 or later, which asks you to trust it at its next start)
+{ "hooks": { "PostToolUse": [ { "matcher": "^apply_patch$", "hooks": [ {
+  "type": "mcp_tool", "server": "shadowgit", "tool": "facts_for_hooks", "timeout": 5,
+  "input": { "event": "${hook_event_name}", "tool": "${tool_name}", "patch": "${tool_input.command}" }
+} ] } ] } }
+```
+
+The hooks sit in your user settings, so they run in every session. In one where the `shadowgit` server isn't connected
+(it was removed, turned off in `/mcp`, or hasn't started yet), Claude Code shows a "hook error" notice and goes on. Turn
+the hooks off in ShadowGit to remove them.
+
 ## Tools
 
 | Tool | Does |
@@ -68,6 +113,7 @@ webshop") when ShadowGit tracks more than one.
 | `write_docs` | Writes pages' words, with links to symbols and areas, or keeps words that still hold; kept in the history, never in the project's files |
 | `get_review_comments` | Reads the review comments you sent from ShadowGit and haven't resolved, by Send, with their lines, words and replies |
 | `reply_to_review_comment` | Replies to one comment: ShadowGit shows the reply under it, with the snapshot that holds the change |
+| `facts_for_hooks` | Answers ShadowGit's hooks with the map's facts on the file your assistant just read or edited; for a direct question, `get_code_context` |
 
 The other tools work on the current project unless given `repo`.
 
