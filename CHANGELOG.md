@@ -2,6 +2,44 @@
 
 All notable changes to the ShadowGit MCP Server will be documented in this file.
 
+## [2.11.0] - 2026-11-15
+
+The map at work: your assistant gets the map's facts as it reads and edits, with no step of its own. Needs ShadowGit
+0.7.0 or later; an older app answers as before, and none of this shows.
+
+### Added
+- The project's outline in the server's instructions, read once as the server starts: its areas, the heaviest links
+  between them, its processes and its rules, in up to about 2,200 characters. Your assistant has the shape of the project before
+  its first question. With the app closed or slow (300 ms), the instructions are as before.
+- `facts_for_hooks`, the tool ShadowGit's hooks call. It answers with the hook's JSON, or with empty text when there is
+  nothing to say: the app closed, a project ShadowGit doesn't track, a file not on the map that no rule holds for, a
+  fact already said in the conversation.
+  - After a read (Claude Code): the file's area and layer, which of its symbols other areas use, and the rules that hold
+    for it.
+  - After an edit (Claude Code and Codex): what changed in the file since the conversation began, for each symbol
+    something depends on. Where the change can break callers, its dependents come with the line where each uses the
+    symbol, where the map has one, and whether its file has changed too; otherwise, how many depend on it and from
+    where. A summary of up to about 2,000 characters: at most six symbols and eight dependents each, the rest through
+    `get_code_context`.
+  - You turn the hooks on in ShadowGit, beside your connected assistant: "Show it the map as it reads and edits". They
+    are off by default.
+- `npm run eval:facts`: the facts arrived before and after the first edit in 5 of 5 runs.
+
+### Changed
+- The dependents in `get_code_context`'s answer come with the line where they use the code, where the map has one (a
+  use at a file's top level has none), so your assistant sees how callers use a function without opening each file. In Claude Code the tool loads with the first prompt, instead of
+  waiting behind tool search.
+- `npm run eval:map`: 5 of 5 runs read the code's context before the first edit.
+
+### Measured
+- A benchmark of 690 runs, 23 change tasks in three real projects with tests the assistant never saw (ShadowGit's
+  `bench/assistant-map`), compared this release with 2.10.0. Claude Code passed 98% with either; the difference was 0.0
+  points (95% interval −2.6 to +2.6) at the same median cost. With the hooks on, 97% (−1.7 points, interval −4.3 to 0.0).
+  Every setup sat near the ceiling: 2.11.0 passed as often as 2.10.0 at about the same median cost (×1.01), with no
+  sign that it helps.
+  The hooks didn't help either, which is why they are a switch, off by default.
+- `facts_for_hooks` answers in 17 ms at p95 after a read and 224 ms after an edit on ShadowGit's own repository.
+
 ## [2.10.0] - 2026-11-09
 
 ### Added
